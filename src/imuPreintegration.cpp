@@ -52,7 +52,7 @@ public:
             }
             catch (tf::TransformException ex)
             {
-                ROS_ERROR("%s",ex.what());
+                ROS_ERROR("no transform found from: %s, to: %s, exception: %s", lidarFrame.c_str(), baselinkFrame.c_str(), ex.what());
             }
         }
 
