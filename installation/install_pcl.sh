@@ -8,12 +8,12 @@
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
 # Releases can be found at: https://github.com/PointCloudLibrary/pcl/releases
-PCL_VERSION=1.11.1
+PCL_VERSION=1.8.1
 
 # IMPORTANT: These variables should match the settings of your catkin workspace
 PROFILE="RelWithDebInfo" # RelWithDebInfo, Release, Debug
 BUILD_WITH_MARCH_NATIVE=true
-CMAKE_STANDARD=17
+CMAKE_STANDARD=14
 
 # The install directory should match to where pcl-ros looks to
 INSTALL_DIR=/usr
@@ -27,9 +27,11 @@ fi
 
 # Defaults taken from mrs_workspace building flags
 BUILD_FLAGS_GENERAL=( 
+              -DPCL_VERSION=1.8
               -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
               -DBUILD_apps=ON
               -DBUILD_examples=ON
+              -DCMAKE_CXX_STANDARD=$CMAKE_STANDARD 
               -DCMAKE_BUILD_TYPE=$PROFILE
               -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 
               -DCMAKE_CXX_FLAGS="-std=c++17 -fno-diagnostics-color $CMAKE_MARCH_NATIVE" 
