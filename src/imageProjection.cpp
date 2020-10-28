@@ -6,14 +6,15 @@ struct PointXYZIRT
 {
     PCL_ADD_POINT4D
     PCL_ADD_INTENSITY;
-    uint16_t ring;
+    uint8_t ring;
+    uint32_t range;
     float t;
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
 POINT_CLOUD_REGISTER_POINT_STRUCT (PointXYZIRT,  
     (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity)
-    (uint16_t, ring, ring) (float, t, t)
+    (uint8_t, ring, ring) (uint32_t, range, range) (float, t, t)
 )
 
   // Ouster
