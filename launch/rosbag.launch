@@ -1,0 +1,10 @@
+<launch>
+
+    <param name="/use_sim_time" value="false" />
+
+    <node pkg="rosbag" type="play" name="player" output="screen" args="--clock /home/pavel/bag_files/sim_byci_skala_aloam.bag"/>
+
+    <!--- LOAM -->
+    <include file="$(find lio_sam)/launch/uav.launch" />
+
+</launch>
