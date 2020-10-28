@@ -354,8 +354,9 @@ public:
             publishGlobalMap();
         }
 
-        if (savePCD == false)
+        if (savePCD == false) {
             return;
+        }
 
         cout << "****************************************************" << endl;
         cout << "Saving map to pcd files ..." << endl;
@@ -395,11 +396,13 @@ public:
 
     void publishGlobalMap()
     {
-        if (pubLaserCloudSurround.getNumSubscribers() == 0)
+        if (pubLaserCloudSurround.getNumSubscribers() == 0) {
             return;
+        }
 
-        if (cloudKeyPoses3D->points.empty() == true)
+        if (cloudKeyPoses3D->points.empty() == true) {
             return;
+        }
 
         pcl::KdTreeFLANN<PointType>::Ptr kdtreeGlobalMap(new pcl::KdTreeFLANN<PointType>());;
         pcl::PointCloud<PointType>::Ptr globalMapKeyPoses(new pcl::PointCloud<PointType>());
@@ -426,8 +429,9 @@ public:
 
         // extract visualized and downsampled key frames
         for (int i = 0; i < (int)globalMapKeyPosesDS->size(); ++i){
-            if (pointDistance(globalMapKeyPosesDS->points[i], cloudKeyPoses3D->back()) > globalMapVisualizationSearchRadius)
+            if (pointDistance(globalMapKeyPosesDS->points[i], cloudKeyPoses3D->back()) > globalMapVisualizationSearchRadius) {
                 continue;
+            }
             int thisKeyInd = (int)globalMapKeyPosesDS->points[i].intensity;
             *globalMapKeyFrames += *transformPointCloud(cornerCloudKeyFrames[thisKeyInd],  &cloudKeyPoses6D->points[thisKeyInd]);
             *globalMapKeyFrames += *transformPointCloud(surfCloudKeyFrames[thisKeyInd],    &cloudKeyPoses6D->points[thisKeyInd]);
@@ -453,8 +457,9 @@ public:
 
     void loopClosureThread()
     {
-        if (loopClosureEnableFlag == false)
+        if (loopClosureEnableFlag == false) {
             return;
+        }
 
         ros::Rate rate(loopClosureFrequency);
         while (ros::ok())
@@ -468,19 +473,22 @@ public:
     void loopInfoHandler(const std_msgs::Float64MultiArray::ConstPtr& loopMsg)
     {
         std::lock_guard<std::mutex> lock(mtxLoopInfo);
-        if (loopMsg->data.size() != 2)
+        if (loopMsg->data.size() != 2) {
             return;
+        }
 
         loopInfoVec.push_back(*loopMsg);
 
-        while (loopInfoVec.size() > 5)
+        while (loopInfoVec.size() > 5) {
             loopInfoVec.pop_front();
+        }
     }
 
     void performLoopClosure()
     {
-        if (cloudKeyPoses3D->points.empty() == true)
+        if (cloudKeyPoses3D->points.empty() == true) {
             return;
+        }
 
         mtx.lock();
         *copy_cloudKeyPoses3D = *cloudKeyPoses3D;
@@ -490,9 +498,11 @@ public:
         // find keys
         int loopKeyCur;
         int loopKeyPre;
-        if (detectLoopClosureExternal(&loopKeyCur, &loopKeyPre) == false)
-            if (detectLoopClosureDistance(&loopKeyCur, &loopKeyPre) == false)
+        if (detectLoopClosureExternal(&loopKeyCur, &loopKeyPre) == false) {
+            if (detectLoopClosureDistance(&loopKeyCur, &loopKeyPre) == false) {
                 return;
+            }
+        }
 
         // extract cloud
         pcl::PointCloud<PointType>::Ptr cureKeyframeCloud(new pcl::PointCloud<PointType>());
@@ -500,10 +510,12 @@ public:
         {
             loopFindNearKeyframes(cureKeyframeCloud, loopKeyCur, 0);
             loopFindNearKeyframes(prevKeyframeCloud, loopKeyPre, historyKeyframeSearchNum);
-            if (cureKeyframeCloud->size() < 300 || prevKeyframeCloud->size() < 1000)
+            if (cureKeyframeCloud->size() < 300 || prevKeyframeCloud->size() < 1000) {
                 return;
-            if (pubHistoryKeyFrames.getNumSubscribers() != 0)
+            }
+            if (pubHistoryKeyFrames.getNumSubscribers() != 0) {
                 publishCloud(&pubHistoryKeyFrames, prevKeyframeCloud, timeLaserInfoStamp, odometryFrame);
+            }
         }
 
         // ICP Settings
@@ -520,8 +532,9 @@ public:
         pcl::PointCloud<PointType>::Ptr unused_result(new pcl::PointCloud<PointType>());
         icp.align(*unused_result);
 
-        if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore)
+        if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore) {
             return;
+        }
 
         // publish corrected cloud
         if (pubIcpKeyFrames.getNumSubscribers() != 0)
@@ -565,8 +578,9 @@ public:
 
         // check loop constraint added before
         auto it = loopIndexContainer.find(loopKeyCur);
-        if (it != loopIndexContainer.end())
+        if (it != loopIndexContainer.end()) {
             return false;
+        }
 
         // find the closest history key frame
         std::vector<int> pointSearchIndLoop;
@@ -584,8 +598,9 @@ public:
             }
         }
 
-        if (loopKeyPre == -1 || loopKeyCur == loopKeyPre)
+        if (loopKeyPre == -1 || loopKeyCur == loopKeyPre) {
             return false;
+        }
 
         *latestID = loopKeyCur;
         *closestID = loopKeyPre;
@@ -600,46 +615,55 @@ public:
         int loopKeyPre = -1;
 
         std::lock_guard<std::mutex> lock(mtxLoopInfo);
-        if (loopInfoVec.empty())
+        if (loopInfoVec.empty()) {
             return false;
+        }
 
         double loopTimeCur = loopInfoVec.front().data[0];
         double loopTimePre = loopInfoVec.front().data[1];
         loopInfoVec.pop_front();
 
-        if (abs(loopTimeCur - loopTimePre) < historyKeyframeSearchTimeDiff)
+        if (abs(loopTimeCur - loopTimePre) < historyKeyframeSearchTimeDiff) {
             return false;
+        }
 
         int cloudSize = copy_cloudKeyPoses6D->size();
-        if (cloudSize < 2)
+        if (cloudSize < 2) {
             return false;
+        }
 
         // latest key
         loopKeyCur = cloudSize - 1;
         for (int i = cloudSize - 1; i >= 0; --i)
         {
-            if (copy_cloudKeyPoses6D->points[i].time >= loopTimeCur)
+            if (copy_cloudKeyPoses6D->points[i].time >= loopTimeCur) {
                 loopKeyCur = round(copy_cloudKeyPoses6D->points[i].intensity);
-            else
+            }
+            else {
                 break;
+            }
         }
 
         // previous key
         loopKeyPre = 0;
         for (int i = 0; i < cloudSize; ++i)
         {
-            if (copy_cloudKeyPoses6D->points[i].time <= loopTimePre)
+            if (copy_cloudKeyPoses6D->points[i].time <= loopTimePre) {
                 loopKeyPre = round(copy_cloudKeyPoses6D->points[i].intensity);
-            else
+            }
+            else {
                 break;
+            }
         }
 
-        if (loopKeyCur == loopKeyPre)
+        if (loopKeyCur == loopKeyPre) {
             return false;
+        }
 
         auto it = loopIndexContainer.find(loopKeyCur);
-        if (it != loopIndexContainer.end())
+        if (it != loopIndexContainer.end()) {
             return false;
+        }
 
         *latestID = loopKeyCur;
         *closestID = loopKeyPre;
@@ -655,14 +679,16 @@ public:
         for (int i = -searchNum; i <= searchNum; ++i)
         {
             int keyNear = key + i;
-            if (keyNear < 0 || keyNear >= cloudSize )
+            if (keyNear < 0 || keyNear >= cloudSize ) {
                 continue;
+            }
             *nearKeyframes += *transformPointCloud(cornerCloudKeyFrames[keyNear], &copy_cloudKeyPoses6D->points[keyNear]);
             *nearKeyframes += *transformPointCloud(surfCloudKeyFrames[keyNear],   &copy_cloudKeyPoses6D->points[keyNear]);
         }
 
-        if (nearKeyframes->empty())
+        if (nearKeyframes->empty()) {
             return;
+        }
 
         // downsample near keyframes
         pcl::PointCloud<PointType>::Ptr cloud_temp(new pcl::PointCloud<PointType>());
@@ -744,8 +770,9 @@ public:
             transformTobeMapped[1] = cloudInfo.imuPitchInit;
             transformTobeMapped[2] = cloudInfo.imuYawInit;
 
-            if (!useImuHeadingInitialization)
+            if (!useImuHeadingInitialization) {
                 transformTobeMapped[2] = 0;
+            }
 
             lastImuTransformation = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit); // save imu before return;
             return;
@@ -798,10 +825,12 @@ public:
         int numPoses = cloudKeyPoses3D->size();
         for (int i = numPoses-1; i >= 0; --i)
         {
-            if ((int)cloudToExtract->size() <= surroundingKeyframeSize)
+            if ((int)cloudToExtract->size() <= surroundingKeyframeSize) {
                 cloudToExtract->push_back(cloudKeyPoses3D->points[i]);
-            else
+            }
+            else {
                 break;
+            }
         }
 
         extractCloud(cloudToExtract);
@@ -830,10 +859,12 @@ public:
         int numPoses = cloudKeyPoses3D->size();
         for (int i = numPoses-1; i >= 0; --i)
         {
-            if (timeLaserInfoCur - cloudKeyPoses6D->points[i].time < 10.0)
+            if (timeLaserInfoCur - cloudKeyPoses6D->points[i].time < 10.0) {
                 surroundingKeyPosesDS->push_back(cloudKeyPoses3D->points[i]);
-            else
+            }
+            else {
                 break;
+            }
         }
 
         extractCloud(surroundingKeyPosesDS);
@@ -846,8 +877,9 @@ public:
         laserCloudSurfFromMap->clear(); 
         for (int i = 0; i < (int)cloudToExtract->size(); ++i)
         {
-            if (pointDistance(cloudToExtract->points[i], cloudKeyPoses3D->back()) > surroundingKeyframeSearchRadius)
+            if (pointDistance(cloudToExtract->points[i], cloudKeyPoses3D->back()) > surroundingKeyframeSearchRadius) {
                 continue;
+            }
 
             int thisKeyInd = (int)cloudToExtract->points[i].intensity;
             if (laserCloudMapContainer.find(thisKeyInd) != laserCloudMapContainer.end()) 
@@ -876,14 +908,16 @@ public:
         laserCloudSurfFromMapDSNum = laserCloudSurfFromMapDS->size();
 
         // clear map cache if too large
-        if (laserCloudMapContainer.size() > 1000)
+        if (laserCloudMapContainer.size() > 1000) {
             laserCloudMapContainer.clear();
+        }
     }
 
     void extractSurroundingKeyFrames()
     {
-        if (cloudKeyPoses3D->points.empty() == true)
+        if (cloudKeyPoses3D->points.empty() == true) {
             return; 
+        }
         
         // if (loopClosureEnableFlag == true)
         // {
@@ -1081,14 +1115,14 @@ public:
     {
         // combine corner coeffs
         for (int i = 0; i < laserCloudCornerLastDSNum; ++i){
-            if (laserCloudOriCornerFlag[i] == true){
+            if (laserCloudOriCornerFlag[i] == true) {
                 laserCloudOri->push_back(laserCloudOriCornerVec[i]);
                 coeffSel->push_back(coeffSelCornerVec[i]);
             }
         }
         // combine surf coeffs
         for (int i = 0; i < laserCloudSurfLastDSNum; ++i){
-            if (laserCloudOriSurfFlag[i] == true){
+            if (laserCloudOriSurfFlag[i] == true) {
                 laserCloudOri->push_back(laserCloudOriSurfVec[i]);
                 coeffSel->push_back(coeffSelSurfVec[i]);
             }
@@ -1225,8 +1259,9 @@ public:
 
     void scan2MapOptimization()
     {
-        if (cloudKeyPoses3D->points.empty())
+        if (cloudKeyPoses3D->points.empty()) {
             return;
+        }
 
         if (laserCloudCornerLastDSNum > edgeFeatureMinValidNum && laserCloudSurfLastDSNum > surfFeatureMinValidNum)
         {
@@ -1243,8 +1278,9 @@ public:
 
                 combineOptimizationCoeffs();
 
-                if (LMOptimization(iterCount) == true)
+                if (LMOptimization(iterCount) == true) {
                     break;              
+                }
             }
 
             transformUpdate();
@@ -1287,18 +1323,21 @@ public:
 
     float constraintTransformation(float value, float limit)
     {
-        if (value < -limit)
+        if (value < -limit) {
             value = -limit;
-        if (value > limit)
+        }
+        if (value > limit) {
             value = limit;
+        }
 
         return value;
     }
 
     bool saveFrame()
     {
-        if (cloudKeyPoses3D->points.empty())
+        if (cloudKeyPoses3D->points.empty()) {
             return true;
+        }
 
         Eigen::Affine3f transStart = pclPointToAffine3f(cloudKeyPoses6D->back());
         Eigen::Affine3f transFinal = pcl::getTransformation(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], 
@@ -1310,8 +1349,9 @@ public:
         if (abs(roll)  < surroundingkeyframeAddingAngleThreshold &&
             abs(pitch) < surroundingkeyframeAddingAngleThreshold && 
             abs(yaw)   < surroundingkeyframeAddingAngleThreshold &&
-            sqrt(x*x + y*y + z*z) < surroundingkeyframeAddingDistThreshold)
+            sqrt(x*x + y*y + z*z) < surroundingkeyframeAddingDistThreshold) {
             return false;
+        }
 
         return true;
     }
@@ -1334,21 +1374,22 @@ public:
 
     void addGPSFactor()
     {
-        if (gpsQueue.empty())
+        if (gpsQueue.empty()) {
             return;
+        }
 
         // wait for system initialized and settles down
-        if (cloudKeyPoses3D->points.empty())
+        if (cloudKeyPoses3D->points.empty()) {
             return;
-        else
-        {
-            if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0)
+        }
+        else if (pointDistance(cloudKeyPoses3D->front(), cloudKeyPoses3D->back()) < 5.0) {
                 return;
         }
 
         // pose covariance small, no need to correct
-        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold)
+        if (poseCovariance(3,3) < poseCovThreshold && poseCovariance(4,4) < poseCovThreshold) {
             return;
+        }
 
         // last gps position
         static PointType lastGPSPoint;
@@ -1374,8 +1415,9 @@ public:
                 float noise_x = thisGPS.pose.covariance[0];
                 float noise_y = thisGPS.pose.covariance[7];
                 float noise_z = thisGPS.pose.covariance[14];
-                if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold)
+                if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold) {
                     continue;
+                }
 
                 float gps_x = thisGPS.pose.pose.position.x;
                 float gps_y = thisGPS.pose.pose.position.y;
@@ -1387,18 +1429,21 @@ public:
                 }
 
                 // GPS not properly initialized (0,0,0)
-                if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6)
+                if (abs(gps_x) < 1e-6 && abs(gps_y) < 1e-6) {
                     continue;
+                }
 
                 // Add GPS every a few meters
                 PointType curGPSPoint;
                 curGPSPoint.x = gps_x;
                 curGPSPoint.y = gps_y;
                 curGPSPoint.z = gps_z;
-                if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0)
+                if (pointDistance(curGPSPoint, lastGPSPoint) < 5.0) {
                     continue;
-                else
+                }
+                else {
                     lastGPSPoint = curGPSPoint;
+                }
 
                 gtsam::Vector Vector3(3);
                 Vector3 << max(noise_x, 1.0f), max(noise_y, 1.0f), max(noise_z, 1.0f);
@@ -1414,8 +1459,9 @@ public:
 
     void addLoopFactor()
     {
-        if (loopIndexQueue.empty())
+        if (loopIndexQueue.empty()) {
             return;
+        }
 
         for (int i = 0; i < (int)loopIndexQueue.size(); ++i)
         {
@@ -1434,8 +1480,9 @@ public:
 
     void saveKeyFramesAndFactor()
     {
-        if (saveFrame() == false)
+        if (saveFrame() == false) {
             return;
+        }
 
         // odom factor
         addOdomFactor();
@@ -1520,8 +1567,9 @@ public:
 
     void correctPoses()
     {
-        if (cloudKeyPoses3D->points.empty())
+        if (cloudKeyPoses3D->points.empty()) {
             return;
+        }
 
         if (aLoopIsClosed == true)
         {
@@ -1631,18 +1679,21 @@ public:
             laserOdomIncremental.pose.pose.position.y = y;
             laserOdomIncremental.pose.pose.position.z = z;
             laserOdomIncremental.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
-            if (isDegenerate)
+            if (isDegenerate) {
                 laserOdomIncremental.pose.covariance[0] = 1;
-            else
+            }
+            else {
                 laserOdomIncremental.pose.covariance[0] = 0;
+            }
         }
         pubLaserOdometryIncremental.publish(laserOdomIncremental);
     }
 
     void publishFrames()
     {
-        if (cloudKeyPoses3D->points.empty())
+        if (cloudKeyPoses3D->points.empty()) {
             return;
+        }
         // publish key poses
         publishCloud(&pubKeyPoses, cloudKeyPoses3D, timeLaserInfoStamp, odometryFrame);
         // Publish surrounding key frames

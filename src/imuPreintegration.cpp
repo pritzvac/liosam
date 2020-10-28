@@ -45,6 +45,7 @@ public:
     {
         if(lidarFrame != baselinkFrame)
         {
+            // TODO: Do not run without this transform
             try
             {
                 tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
@@ -96,14 +97,17 @@ public:
         imuOdomQueue.push_back(*odomMsg);
 
         // get latest odometry (at current IMU stamp)
-        if (lidarOdomTime == -1)
+        if (lidarOdomTime == -1) {
             return;
+        }
         while (!imuOdomQueue.empty())
         {
-            if (imuOdomQueue.front().header.stamp.toSec() <= lidarOdomTime)
+            if (imuOdomQueue.front().header.stamp.toSec() <= lidarOdomTime) {
                 imuOdomQueue.pop_front();
-            else
+            }
+            else {
                 break;
+            }
         }
         Eigen::Affine3f imuOdomAffineFront = odom2affine(imuOdomQueue.front());
         Eigen::Affine3f imuOdomAffineBack = odom2affine(imuOdomQueue.back());
@@ -124,8 +128,9 @@ public:
         static tf::TransformBroadcaster tfOdom2BaseLink;
         tf::Transform tCur;
         tf::poseMsgToTF(laserOdometry.pose.pose, tCur);
-        if(lidarFrame != baselinkFrame)
+        if(lidarFrame != baselinkFrame) {
             tCur = tCur * lidar2Baselink;
+        }
         tf::StampedTransform odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
         tfOdom2BaseLink.sendTransform(odom_2_baselink);
 
@@ -141,8 +146,9 @@ public:
             pose_stamped.header.frame_id = odometryFrame;
             pose_stamped.pose = laserOdometry.pose.pose;
             imuPath.poses.push_back(pose_stamped);
-            while(!imuPath.poses.empty() && imuPath.poses.front().header.stamp.toSec() < lidarOdomTime - 1.0)
+            while(!imuPath.poses.empty() && imuPath.poses.front().header.stamp.toSec() < lidarOdomTime - 1.0) {
                 imuPath.poses.erase(imuPath.poses.begin());
+            }
             if (pubImuPath.getNumSubscribers() != 0)
             {
                 imuPath.header.stamp = imuOdomQueue.back().header.stamp;
@@ -254,8 +260,9 @@ public:
         double currentCorrectionTime = ROS_TIME(odomMsg);
 
         // make sure we have imu data to integrate
-        if (imuQueOpt.empty())
+        if (imuQueOpt.empty()) {
             return;
+        }
 
         float p_x = odomMsg->pose.pose.position.x;
         float p_y = odomMsg->pose.pose.position.y;
@@ -281,8 +288,9 @@ public:
                     lastImuT_opt = ROS_TIME(&imuQueOpt.front());
                     imuQueOpt.pop_front();
                 }
-                else
+                else {
                     break;
+                }
             }
             // initial pose
             prevPose_ = lidarPose.compose(lidar2Imu);
@@ -361,8 +369,9 @@ public:
                 lastImuT_opt = imuTime;
                 imuQueOpt.pop_front();
             }
-            else
+            else {
                 break;
+            }
         }
         // add imu factor to graph
         const gtsam::PreintegratedImuMeasurements& preint_imu = dynamic_cast<const gtsam::PreintegratedImuMeasurements&>(*imuIntegratorOpt_);
@@ -462,8 +471,9 @@ public:
         imuQueOpt.push_back(thisImu);
         imuQueImu.push_back(thisImu);
 
-        if (doneFirstOpt == false)
+        if (doneFirstOpt == false) {
             return;
+        }
 
         double imuTime = ROS_TIME(&thisImu);
         double dt = (lastImuT_imu < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_imu);

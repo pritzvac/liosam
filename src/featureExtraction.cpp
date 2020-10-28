@@ -111,9 +111,9 @@ public:
             float depth2 = cloudInfo.pointRange[i+1];
             int columnDiff = std::abs(int(cloudInfo.pointColInd[i+1] - cloudInfo.pointColInd[i]));
 
-            if (columnDiff < 10){
+            if (columnDiff < 10) {
                 // 10 pixel diff in range image
-                if (depth1 - depth2 > 0.3){
+                if (depth1 - depth2 > 0.3) {
                     cloudNeighborPicked[i - 5] = 1;
                     cloudNeighborPicked[i - 4] = 1;
                     cloudNeighborPicked[i - 3] = 1;
@@ -133,8 +133,9 @@ public:
             float diff1 = std::abs(float(cloudInfo.pointRange[i-1] - cloudInfo.pointRange[i]));
             float diff2 = std::abs(float(cloudInfo.pointRange[i+1] - cloudInfo.pointRange[i]));
 
-            if (diff1 > 0.02 * cloudInfo.pointRange[i] && diff2 > 0.02 * cloudInfo.pointRange[i])
+            if (diff1 > 0.02 * cloudInfo.pointRange[i] && diff2 > 0.02 * cloudInfo.pointRange[i]) {
                 cloudNeighborPicked[i] = 1;
+            }
         }
     }
 
@@ -156,8 +157,9 @@ public:
                 int sp = (cloudInfo.startRingIndex[i] * (6 - j) + cloudInfo.endRingIndex[i] * j) / 6;
                 int ep = (cloudInfo.startRingIndex[i] * (5 - j) + cloudInfo.endRingIndex[i] * (j + 1)) / 6 - 1;
 
-                if (sp >= ep)
+                if (sp >= ep) {
                     continue;
+                }
 
                 std::sort(cloudSmoothness.begin()+sp, cloudSmoothness.begin()+ep, by_value());
 
@@ -179,15 +181,17 @@ public:
                         for (int l = 1; l <= 5; l++)
                         {
                             int columnDiff = std::abs(int(cloudInfo.pointColInd[ind + l] - cloudInfo.pointColInd[ind + l - 1]));
-                            if (columnDiff > 10)
+                            if (columnDiff > 10) {
                                 break;
+                            }
                             cloudNeighborPicked[ind + l] = 1;
                         }
                         for (int l = -1; l >= -5; l--)
                         {
                             int columnDiff = std::abs(int(cloudInfo.pointColInd[ind + l] - cloudInfo.pointColInd[ind + l + 1]));
-                            if (columnDiff > 10)
+                            if (columnDiff > 10) {
                                 break;
+                            }
                             cloudNeighborPicked[ind + l] = 1;
                         }
                     }
@@ -205,16 +209,18 @@ public:
                         for (int l = 1; l <= 5; l++) {
 
                             int columnDiff = std::abs(int(cloudInfo.pointColInd[ind + l] - cloudInfo.pointColInd[ind + l - 1]));
-                            if (columnDiff > 10)
+                            if (columnDiff > 10) {
                                 break;
+                            }
 
                             cloudNeighborPicked[ind + l] = 1;
                         }
                         for (int l = -1; l >= -5; l--) {
 
                             int columnDiff = std::abs(int(cloudInfo.pointColInd[ind + l] - cloudInfo.pointColInd[ind + l + 1]));
-                            if (columnDiff > 10)
+                            if (columnDiff > 10) {
                                 break;
+                            }
 
                             cloudNeighborPicked[ind + l] = 1;
                         }

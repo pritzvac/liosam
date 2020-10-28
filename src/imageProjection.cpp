@@ -174,11 +174,13 @@ public:
 
     void cloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloudMsg)
     {
-        if (!cachePointCloud(laserCloudMsg))
+        if (!cachePointCloud(laserCloudMsg)) {
             return;
+        }
 
-        if (!deskewInfo())
+        if (!deskewInfo()) {
             return;
+        }
 
         projectPointCloud();
 
@@ -193,8 +195,9 @@ public:
     {
         // cache point cloud
         cloudQueue.push_back(*laserCloudMsg);
-        if (cloudQueue.size() <= 2)
+        if (cloudQueue.size() <= 2) {
             return false;
+        }
 
         // convert cloud
         currentCloudMsg = cloudQueue.front();
@@ -278,14 +281,17 @@ public:
 
         while (!imuQueue.empty())
         {
-            if (imuQueue.front().header.stamp.toSec() < timeScanCur - 0.01)
+            if (imuQueue.front().header.stamp.toSec() < timeScanCur - 0.01) {
                 imuQueue.pop_front();
-            else
+            }
+            else {
                 break;
+            }
         }
 
-        if (imuQueue.empty())
+        if (imuQueue.empty()) {
             return;
+        }
 
         imuPointerCur = 0;
 
@@ -295,13 +301,15 @@ public:
             double currentImuTime = thisImuMsg.header.stamp.toSec();
 
             // get roll, pitch, and yaw estimation for this scan
-            if (currentImuTime <= timeScanCur)
+            if (currentImuTime <= timeScanCur) {
                 imuRPY2rosRPY(&thisImuMsg, &cloudInfo.imuRollInit, &cloudInfo.imuPitchInit, &cloudInfo.imuYawInit);
+            }
 
-            if (currentImuTime > timeScanEnd + 0.01)
+            if (currentImuTime > timeScanEnd + 0.01) {
                 break;
+            }
 
-            if (imuPointerCur == 0){
+            if (imuPointerCur == 0) {
                 imuRotX[0] = 0;
                 imuRotY[0] = 0;
                 imuRotZ[0] = 0;
@@ -325,8 +333,9 @@ public:
 
         --imuPointerCur;
 
-        if (imuPointerCur <= 0)
+        if (imuPointerCur <= 0) {
             return;
+        }
 
         cloudInfo.imuAvailable = true;
     }
@@ -337,17 +346,21 @@ public:
 
         while (!odomQueue.empty())
         {
-            if (odomQueue.front().header.stamp.toSec() < timeScanCur - 0.01)
+            if (odomQueue.front().header.stamp.toSec() < timeScanCur - 0.01) {
                 odomQueue.pop_front();
-            else
+            }
+            else {
                 break;
+            }
         }
 
-        if (odomQueue.empty())
+        if (odomQueue.empty()) {
             return;
+        }
 
-        if (odomQueue.front().header.stamp.toSec() > timeScanCur)
+        if (odomQueue.front().header.stamp.toSec() > timeScanCur) {
             return;
+        }
 
         // get start odometry at the beinning of the scan
         nav_msgs::Odometry startOdomMsg;
@@ -356,10 +369,12 @@ public:
         {
             startOdomMsg = odomQueue[i];
 
-            if (ROS_TIME(&startOdomMsg) < timeScanCur)
+            if (ROS_TIME(&startOdomMsg) < timeScanCur) {
                 continue;
-            else
+            }
+            else {
                 break;
+            }
         }
 
         tf::Quaternion orientation;
@@ -381,8 +396,9 @@ public:
         // get end odometry at the end of the scan
         odomDeskewFlag = false;
 
-        if (odomQueue.back().header.stamp.toSec() < timeScanEnd)
+        if (odomQueue.back().header.stamp.toSec() < timeScanEnd) {
             return;
+        }
 
         nav_msgs::Odometry endOdomMsg;
 
@@ -390,14 +406,17 @@ public:
         {
             endOdomMsg = odomQueue[i];
 
-            if (ROS_TIME(&endOdomMsg) < timeScanEnd)
+            if (ROS_TIME(&endOdomMsg) < timeScanEnd) {
                 continue;
-            else
+            }
+            else {
                 break;
+            }
         }
 
-        if (int(round(startOdomMsg.pose.covariance[0])) != int(round(endOdomMsg.pose.covariance[0])))
+        if (int(round(startOdomMsg.pose.covariance[0])) != int(round(endOdomMsg.pose.covariance[0]))) {
             return;
+        }
 
         Eigen::Affine3f transBegin = pcl::getTransformation(startOdomMsg.pose.pose.position.x, startOdomMsg.pose.pose.position.y, startOdomMsg.pose.pose.position.z, roll, pitch, yaw);
 
@@ -420,8 +439,9 @@ public:
         int imuPointerFront = 0;
         while (imuPointerFront < imuPointerCur)
         {
-            if (pointTime < imuTime[imuPointerFront])
+            if (pointTime < imuTime[imuPointerFront]) {
                 break;
+            }
             ++imuPointerFront;
         }
 
@@ -458,8 +478,9 @@ public:
 
     PointType deskewPoint(PointType *point, double relTime)
     {
-        if (deskewFlag == -1 || cloudInfo.imuAvailable == false)
+        if (deskewFlag == -1 || cloudInfo.imuAvailable == false) {
             return *point;
+        }
 
         double pointTime = timeScanCur + relTime;
 
@@ -490,7 +511,7 @@ public:
 
     void projectPointCloud()
     {
-        int cloudSize = laserCloudIn->points.size();
+        const int cloudSize = laserCloudIn->points.size();
         // range image projection
         for (int i = 0; i < cloudSize; ++i)
         {
@@ -500,36 +521,45 @@ public:
             thisPoint.z = laserCloudIn->points[i].z;
             thisPoint.intensity = laserCloudIn->points[i].intensity;
 
-            float range = pointDistance(thisPoint);
-            if (range < lidarMinRange || range > lidarMaxRange)
+            /* const float range = pointDistance(thisPoint); */
+            const float range = laserCloudIn->points.at(i).range / 1000.0f;
+            if (range < lidarMinRange || range > lidarMaxRange) {
                 continue;
-
-            int rowIdn = laserCloudIn->points[i].ring;
-            if (rowIdn < 0 || rowIdn >= N_SCAN)
+            }
+            
+            const int rowIdn = laserCloudIn->points[i].ring;
+            if (rowIdn < 0 || rowIdn >= N_SCAN) {
+                /* ROS_ERROR("Invalid ring: %d", rowIdn); */
                 continue;
-
-            if (rowIdn % downsampleRate != 0)
-                continue;
-
-            float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
-
+            }
+            
+            if (rowIdn % downsampleRate != 0) {
+              /* ROS_ERROR("Downsampling. Throwing away row: %d", rowIdn); */
+              continue;
+            }
+            
+            // TODO: polish this monstrosity
+            const float horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
             static float ang_res_x = 360.0/float(Horizon_SCAN);
             int columnIdn = -round((horizonAngle-90.0)/ang_res_x) + Horizon_SCAN/2;
-            if (columnIdn >= Horizon_SCAN)
+            if (columnIdn >= Horizon_SCAN) {
                 columnIdn -= Horizon_SCAN;
+            }
 
-            if (columnIdn < 0 || columnIdn >= Horizon_SCAN)
+            if (columnIdn < 0 || columnIdn >= Horizon_SCAN) {
                 continue;
+            }
 
-            if (rangeMat.at<float>(rowIdn, columnIdn) != FLT_MAX)
+            if (rangeMat.at<float>(rowIdn, columnIdn) != FLT_MAX) {
                 continue;
+            }
 
             /* thisPoint = deskewPoint(&thisPoint, laserCloudIn->points[i].time); // Velodyne */
             thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->points[i].t / 1000000000.0); // Ouster
 
             rangeMat.at<float>(rowIdn, columnIdn) = range;
 
-            int index = columnIdn + rowIdn * Horizon_SCAN;
+            const int index = columnIdn + rowIdn * Horizon_SCAN;
             fullCloud->points[index] = thisPoint;
         }
     }
