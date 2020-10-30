@@ -42,13 +42,23 @@ public:
 
   TransformFusion() {
     if (lidarFrame != baselinkFrame) {
-      // TODO: Do not run without this transform
-      try {
-        tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
-        tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
+
+      bool tf_found = false;
+      for (int i = 0; i < 5; i++) {
+
+        try {
+          tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
+          tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
+          tf_found = true;
+          break;
+        }
+        catch (tf::TransformException ex) {
+        }
       }
-      catch (tf::TransformException ex) {
-        ROS_ERROR("no transform found from: %s, to: %s, exception: %s", lidarFrame.c_str(), baselinkFrame.c_str(), ex.what());
+
+      if (!tf_found) {
+        ROS_ERROR("no transform found from: %s, to: %s. Ending!", lidarFrame.c_str(), baselinkFrame.c_str());
+        ros::shutdown();
       }
     }
 
@@ -341,6 +351,13 @@ public:
       double            imuTime = ROS_TIME(thisImu);
       if (imuTime < currentCorrectionTime - delta_t) {
         double dt = (lastImuT_opt < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_opt);
+
+        if (dt <= 0) {
+          ROS_WARN("invalid dt (opt): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_opt, dt);
+          imuQueOpt.pop_front();
+          continue;
+        }
+
         imuIntegratorOpt_->integrateMeasurement(gtsam::Vector3(thisImu->linear_acceleration.x, thisImu->linear_acceleration.y, thisImu->linear_acceleration.z),
                                                 gtsam::Vector3(thisImu->angular_velocity.x, thisImu->angular_velocity.y, thisImu->angular_velocity.z), dt);
 
@@ -405,6 +422,11 @@ public:
         double            imuTime = ROS_TIME(thisImu);
         double            dt      = (lastImuQT < 0) ? (1.0 / 500.0) : (imuTime - lastImuQT);
 
+        if (dt <= 0) {
+          ROS_WARN("invalid dt (QT): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuQT, dt);
+          continue;
+        }
+
         imuIntegratorImu_->integrateMeasurement(gtsam::Vector3(thisImu->linear_acceleration.x, thisImu->linear_acceleration.y, thisImu->linear_acceleration.z),
                                                 gtsam::Vector3(thisImu->angular_velocity.x, thisImu->angular_velocity.y, thisImu->angular_velocity.z), dt);
         lastImuQT = imuTime;
@@ -418,7 +440,7 @@ public:
   bool failureDetection(const gtsam::Vector3& velCur, const gtsam::imuBias::ConstantBias& biasCur) {
     Eigen::Vector3f vel(velCur.x(), velCur.y(), velCur.z());
     if (vel.norm() > 30) {
-      ROS_WARN("Large velocity, reset IMU-preintegration!");
+      ROS_WARN("Large velocity (%0.1f, %0.1f, %0.1f), reset IMU-preintegration!", vel.x(), vel.y(), vel.z());
       return true;
     }
 
@@ -446,7 +468,11 @@ public:
 
     double imuTime = ROS_TIME(&thisImu);
     double dt      = (lastImuT_imu < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_imu);
-    lastImuT_imu   = imuTime;
+    if (dt <= 0) {
+      ROS_WARN("invalid dt (imu): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_imu, dt);
+      return;
+    }
+    lastImuT_imu = imuTime;
 
     // integrate this single imu message
     imuIntegratorImu_->integrateMeasurement(gtsam::Vector3(thisImu.linear_acceleration.x, thisImu.linear_acceleration.y, thisImu.linear_acceleration.z),
