@@ -6,14 +6,14 @@ struct PointXYZIRT
 {
   PCL_ADD_POINT4D
   PCL_ADD_INTENSITY;
+  uint32_t t;
   uint8_t  ring;
   uint32_t range;
-  float    t;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
-POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(uint8_t, ring, ring)(uint32_t, range,
-                                                                                                                                         range)(float, t, t))
+POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity,
+                                                                                       intensity)(uint32_t, t, t)(uint8_t, ring, ring)(uint32_t, range, range))
 
 // Ouster
 /* struct PointXYZIRT { */
@@ -243,7 +243,13 @@ public:
 
     // make sure IMU data available for the scan
     if (imuQueue.empty() || imuQueue.front().header.stamp.toSec() > timeScanCur || imuQueue.back().header.stamp.toSec() < timeScanEnd) {
-      ROS_DEBUG("Waiting for IMU data ...");
+      if (imuQueue.empty()) {
+        ROS_WARN("Waiting for IMU data ... imu queue is empty");
+      } else if (imuQueue.front().header.stamp.toSec() > timeScanCur) {
+        ROS_WARN("Waiting for IMU data ... imu msg time (%0.2f) > time scan cur (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanCur);
+      } else if (imuQueue.back().header.stamp.toSec() < timeScanEnd) {
+        ROS_WARN("Waiting for IMU data ... imu msg time (%0.2f) < time scan end time (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanEnd);
+      }
       return false;
     }
 

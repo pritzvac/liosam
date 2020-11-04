@@ -1519,7 +1519,7 @@ public:
     nav_msgs::Odometry laserOdometryROS;
     laserOdometryROS.header.stamp          = timeLaserInfoStamp;
     laserOdometryROS.header.frame_id       = odometryFrame;
-    laserOdometryROS.child_frame_id        = "odom_mapping";
+    laserOdometryROS.child_frame_id        = baselinkFrame;
     laserOdometryROS.pose.pose.position.x  = transformTobeMapped[3];
     laserOdometryROS.pose.pose.position.y  = transformTobeMapped[4];
     laserOdometryROS.pose.pose.position.z  = transformTobeMapped[5];
@@ -1527,11 +1527,11 @@ public:
     pubLaserOdometryGlobal.publish(laserOdometryROS);
 
     // Publish TF
-    static tf::TransformBroadcaster br;
-    tf::Transform        t_odom_to_lidar = tf::Transform(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]),
-                                                  tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
-    tf::StampedTransform trans_odom_to_lidar = tf::StampedTransform(t_odom_to_lidar, timeLaserInfoStamp, odometryFrame, "lidar_link");
-    br.sendTransform(trans_odom_to_lidar);
+    /* static tf::TransformBroadcaster br; */
+    /* tf::Transform        t_odom_to_lidar = tf::Transform(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]), */
+    /*                                               tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5])); */
+    /* tf::StampedTransform trans_odom_to_lidar = tf::StampedTransform(t_odom_to_lidar, timeLaserInfoStamp, odometryFrame, "lidar_link"); */
+    /* br.sendTransform(trans_odom_to_lidar); */
 
     // Publish odometry for ROS (incremental)
     static bool               lastIncreOdomPubFlag = false;
@@ -1568,7 +1568,7 @@ public:
       }
       laserOdomIncremental.header.stamp          = timeLaserInfoStamp;
       laserOdomIncremental.header.frame_id       = odometryFrame;
-      laserOdomIncremental.child_frame_id        = "odom_mapping";
+      laserOdomIncremental.child_frame_id        = baselinkFrame;
       laserOdomIncremental.pose.pose.position.x  = x;
       laserOdomIncremental.pose.pose.position.y  = y;
       laserOdomIncremental.pose.pose.position.z  = z;

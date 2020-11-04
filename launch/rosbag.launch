@@ -1,8 +1,15 @@
 <launch>
 
-    <param name="/use_sim_time" value="false" />
+    <param name="/use_sim_time" value="true" />
 
-    <node pkg="rosbag" type="play" name="player" output="screen" args="--clock /home/pavel/bag_files/sim_byci_skala_aloam.bag"/>
+    <arg name="bag_path" default="$(env HOME)/bag_files" />
+    <!-- <arg name="bag" default="skoda_js_ouster_flight_4.bag" /> -->
+    <arg name="bag" default="stara_voda_altitude_drift_high_res.bag" />
+    <!-- <arg name="bag" default="lab.bag" /> -->
+
+    <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg bag_path)/$(arg bag)"/>
+
+    <include file="$(find mrs_attitude_estimation)/launch/ouster.launch" />
 
     <!--- LOAM -->
     <include file="$(find lio_sam)/launch/uav.launch" />

@@ -49,6 +49,11 @@ public:
         try {
           tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
           tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
+          // TODO: remove this after dataset testing
+          /* tf::Transform tf_tmp; */
+          /* tf_tmp.setIdentity(); */
+          /* tf_tmp.setOrigin(lidar2Baselink.getOrigin()); */
+          /* lidar2Baselink.setData(tf_tmp); */
           tf_found = true;
           break;
         }
@@ -120,6 +125,8 @@ public:
 
     // publish latest odometry
     nav_msgs::Odometry laserOdometry    = imuOdomQueue.back();
+    laserOdometry.header.frame_id       = odometryFrame;
+    laserOdometry.child_frame_id        = baselinkFrame;
     laserOdometry.pose.pose.position.x  = x;
     laserOdometry.pose.pose.position.y  = y;
     laserOdometry.pose.pose.position.z  = z;
@@ -353,7 +360,7 @@ public:
         double dt = (lastImuT_opt < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_opt);
 
         if (dt <= 0) {
-          ROS_WARN("invalid dt (opt): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_opt, dt);
+          ROS_WARN_COND(dt < 0, "invalid dt (opt): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_opt, dt);
           imuQueOpt.pop_front();
           continue;
         }
@@ -423,7 +430,7 @@ public:
         double            dt      = (lastImuQT < 0) ? (1.0 / 500.0) : (imuTime - lastImuQT);
 
         if (dt <= 0) {
-          ROS_WARN("invalid dt (QT): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuQT, dt);
+          ROS_WARN_COND(dt < 0, "invalid dt (QT): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuQT, dt);
           continue;
         }
 
@@ -469,7 +476,7 @@ public:
     double imuTime = ROS_TIME(&thisImu);
     double dt      = (lastImuT_imu < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_imu);
     if (dt <= 0) {
-      ROS_WARN("invalid dt (imu): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_imu, dt);
+      ROS_WARN_COND(dt < 0, "invalid dt (imu): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_imu, dt);
       return;
     }
     lastImuT_imu = imuTime;
@@ -485,7 +492,7 @@ public:
     nav_msgs::Odometry odometry;
     odometry.header.stamp    = thisImu.header.stamp;
     odometry.header.frame_id = odometryFrame;
-    odometry.child_frame_id  = "odom_imu";
+    odometry.child_frame_id  = baselinkFrame;
 
     // transform imu pose to ldiar
     gtsam::Pose3 imuPose   = gtsam::Pose3(currentState.quaternion(), currentState.position());
