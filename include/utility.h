@@ -94,6 +94,7 @@ public:
   float  lidarMaxRange;
 
   // IMU
+  string             imuType;
   float              imuAccNoise;
   float              imuGyrNoise;
   float              imuAccBiasN;
@@ -101,10 +102,8 @@ public:
   float              imuGravity;
   float              imuRPYWeight;
   vector<double>     extRotV;
-  vector<double>     extRPYV;
   vector<double>     extTransV;
   Eigen::Matrix3d    extRot;
-  Eigen::Matrix3d    extRPY;
   Eigen::Vector3d    extTrans;
   Eigen::Quaterniond extQRPY;
 
@@ -147,10 +146,16 @@ public:
   float globalMapVisualizationLeafSize;
 
   ParamServer() {
+
+    nh.param<std::string>("lio_sam/imuType", imuType, "mavros_imu");
+    ROS_ERROR("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+
     nh.param<std::string>("/robot_id", robot_id, "roboat");
 
     nh.param<std::string>("lio_sam/pointCloudTopic", pointCloudTopic, "points_raw");
-    nh.param<std::string>("lio_sam/imuTopic", imuTopic, "imu_correct");
+    ROS_ERROR("[%s]: loading imu_topic: %s", ros::this_node::getName().c_str(), std::string("lio_sam/" + imuType + "/imuTopic").c_str());
+    nh.param<std::string>("lio_sam/" + imuType + "/imuTopic", imuTopic, "imu_correct");
+    ROS_ERROR("[%s]: loaded imu_topic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
     nh.param<std::string>("lio_sam/odomTopic", odomTopic, "odometry/imu");
     nh.param<std::string>("lio_sam/gpsTopic", gpsTopic, "odometry/gps");
 
@@ -174,19 +179,17 @@ public:
     nh.param<float>("lio_sam/lidarMinRange", lidarMinRange, 1.0);
     nh.param<float>("lio_sam/lidarMaxRange", lidarMaxRange, 1000.0);
 
-    nh.param<float>("lio_sam/imuAccNoise", imuAccNoise, 0.01);
-    nh.param<float>("lio_sam/imuGyrNoise", imuGyrNoise, 0.001);
-    nh.param<float>("lio_sam/imuAccBiasN", imuAccBiasN, 0.0002);
-    nh.param<float>("lio_sam/imuGyrBiasN", imuGyrBiasN, 0.00003);
+    nh.param<float>("lio_sam/" + imuType + "/imuAccNoise", imuAccNoise, 0.01);
+    nh.param<float>("lio_sam/" + imuType + "/imuGyrNoise", imuGyrNoise, 0.001);
+    nh.param<float>("lio_sam/" + imuType + "/imuAccBiasN", imuAccBiasN, 0.0002);
+    nh.param<float>("lio_sam/" + imuType + "/imuGyrBiasN", imuGyrBiasN, 0.00003);
+    nh.param<float>("lio_sam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01);
     nh.param<float>("lio_sam/imuGravity", imuGravity, 9.80511);
-    nh.param<float>("lio_sam/imuRPYWeight", imuRPYWeight, 0.01);
-    nh.param<vector<double>>("lio_sam/extrinsicRot", extRotV, vector<double>());
-    nh.param<vector<double>>("lio_sam/extrinsicRPY", extRPYV, vector<double>());
-    nh.param<vector<double>>("lio_sam/extrinsicTrans", extTransV, vector<double>());
+    nh.param<vector<double>>("lio_sam/" + imuType + "/extrinsicRot", extRotV, vector<double>());
+    nh.param<vector<double>>("lio_sam/" + imuType + "/extrinsicTrans", extTransV, vector<double>());
     extRot   = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRotV.data(), 3, 3);
-    extRPY   = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extRPYV.data(), 3, 3);
     extTrans = Eigen::Map<const Eigen::Matrix<double, -1, -1, Eigen::RowMajor>>(extTransV.data(), 3, 1);
-    extQRPY  = Eigen::Quaterniond(extRPY);
+    extQRPY  = Eigen::Quaterniond(extRot);
 
     nh.param<float>("lio_sam/edgeThreshold", edgeThreshold, 0.1);
     nh.param<float>("lio_sam/surfThreshold", surfThreshold, 0.1);
