@@ -2,23 +2,35 @@
 
     <param name="/use_sim_time" value="false" />
 
-    <!-- imu_type: "os1_imu" # {os1_imu, mavros_imu} -->
-    <arg name="imu" default="mavros_imu" />
-
-    <!-- <arg name="bag_path" default="/media/pavel/Extreme\ SSD/pavel_ntb_backup_do_not_delete_pls/bag_files" /> -->
-    <!-- <arg name="bag" default="os1_dataset_kn_manual.bag" /> -->
-    <arg name="bag" default="os1_dataset_kn_autonomous.bag" />
+    <!-- imu_type: {os1_imu, mavros_imu, vio_imu, xsens_imu} -->
+    <arg name="imu" default="vio_imu" />
 
     <arg name="bag_path" default="$(env HOME)/bag_files" />
-    <!-- <arg name="bag" default="stara_voda_altitude_drift_high_res.bag" /> -->
-    <!-- <arg name="bag" default="skoda_js_ouster_flight_4.bag" /> -->
-    <!-- <arg name="bag" default="lab.bag" /> -->
+    <arg name="bag" default="manual_flight_four_imus.bag" />
 
-    <include file="$(find mrs_attitude_estimation)/launch/$(arg imu).launch" />
+    <!-- IMU filtration -->
+    <include file="$(find mrs_imu_utils)/launch/filter_imu.launch" >
+      
+      <arg name="imu_config" value="$(arg imu)" />
+
+      <arg if="$(eval arg('imu') == 'mavros_imu')" name="estimate_attitude" value="false" />
+      <arg if="$(eval arg('imu') == 'mavros_imu')" name="topic_in" default="mavros/imu/data" />
+      <arg if="$(eval arg('imu') == 'mavros_imu')" name="topic_out" default="mavros/imu/data_filt" />
+
+      <arg if="$(eval arg('imu') == 'os1_imu')" name="estimate_attitude" value="true" />
+      <arg if="$(eval arg('imu') == 'os1_imu')" name="topic_in" default="os1_cloud_node/imu" />
+      <arg if="$(eval arg('imu') == 'os1_imu')" name="topic_out" default="os1_cloud_node/imu_data" />
+
+      <arg if="$(eval arg('imu') == 'vio_imu')" name="estimate_attitude" value="true" />
+      <arg if="$(eval arg('imu') == 'vio_imu')" name="topic_in" default="vio_imu/imu_raw" />
+      <arg if="$(eval arg('imu') == 'vio_imu')" name="topic_out" default="vio_imu/data" />
+
+    </include>
 
     <!--- LOAM -->
     <include file="$(find lio_sam)/launch/uav.launch" />
 
+    <!-- Rosbag -->
     <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg bag_path)/$(arg bag)" launch-prefix="bash -c 'sleep 3; $0 $@'"/>
 
 </launch>

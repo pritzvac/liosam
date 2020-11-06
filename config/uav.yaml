@@ -1,6 +1,6 @@
 lio_sam:
 
-  imuType: "mavros_imu" # {os1_imu, mavros_imu}
+  imuType: "vio_imu" # {os1_imu, mavros_imu, vio_imu, xsens_imu}
 
   # Topics
   pointCloudTopic: "/uav68/os1_cloud_node/points"            # Point cloud data
@@ -34,34 +34,63 @@ lio_sam:
   # Default IMU params
   imuGravity: 9.80511
   # Acc/Gyr noise/bias can be found using https://github.com/gaowenliang/imu_utils
-  
+ 
+  # Mavros IMU real
+  mavros_imu:
+    imuTopic: "/uav68/mavros/imu/data_filt"
+    imuRPYWeight: 0.99
+    imuAccNoise: 1.4465189223444881e+00
+    imuGyrNoise: 3.5449071466580058e-02
+    imuAccBiasN: 8.9424184726145852e-04
+    imuGyrBiasN: 4.8477797168896648e-03
+    # lidar -> imu tf
+    extrinsicTrans: [0.0, 0.0, -0.1]
+    extrinsicRot: [-1, 0, 0,
+                   0, -1, 0,
+                   0, 0, 1]
+
   # Ouster IMU
   os1_imu:
-    imuTopic: "/uav68/os1_cloud_node/imu_atti"
+    imuTopic: "/uav68/os1_cloud_node/imu_data"
     imuRPYWeight: 0.01
-    imuAccNoise: 5.6467435774287290e02
-    imuGyrNoise: 2.5087842798686730e01
-    imuAccBiasN: 2.7727326881233586e-03
-    imuGyrBiasN: 8.8050606294566648e-05
+    imuAccNoise: 1.8279743741630960e+00
+    imuGyrNoise: 8.8078908780875473e-02
+    imuAccBiasN: 8.9256192570144235e-02
+    imuGyrBiasN: 4.8477797168896648e-03
     # lidar -> imu tf
     extrinsicTrans: [-0.006253, 0.011775, -0.028535]
     extrinsicRot: [-1, 0, 0,
                    0, -1, 0,
                    0, 0, 1]
 
-  # Mavros IMU real
-  mavros_imu:
-    imuTopic: "/uav68/mavros/imu/data_atti"
-    imuRPYWeight: 0.99
-    imuAccNoise: 1.9524510678141670e-02
-    imuGyrNoise: 1.6464580888175019e-03
-    imuAccBiasN: 8.9424184726145852e-04
-    imuGyrBiasN: 1.1975077172544225e-04
-    # lidar -> imu tf
-    extrinsicTrans: [0.0, 0.0, -0.1]
+  # VIO IMU
+  vio_imu:
+    imuTopic: "/uav68/vio_imu/data"
+    imuRPYWeight: 0.01
+    imuAccNoise: 1.7391734436505606e+00
+    imuGyrNoise: 1.7232641708847982e-01
+    imuAccBiasN: 2.2595603813254508e-02
+    imuGyrBiasN: 1.0910192034708675e-03
+    # lidar -> imu tf TBD translation
+    extrinsicTrans: [0.0, 0.0, 0.0735]
     extrinsicRot: [-1, 0, 0,
                    0, -1, 0,
                    0, 0, 1]
+
+  # XSENS MTi-30 IMU
+  xsens_imu:
+    imuTopic: "/imu/data"
+    imuRPYWeight: 0.01
+    imuAccNoise: 8.8146213961764186e-01
+    imuGyrNoise: 1.9927667785268124e-01
+    imuAccBiasN: 3.8034243866029660e-02
+    imuGyrBiasN: 4.3899304540653836e-03
+    # lidar -> imu tf TBD translation
+    extrinsicTrans: [0.0, 0.0, 0.08]
+    extrinsicRot: [-1, 0, 0,
+                   0, -1, 0,
+                   0, 0, 1]
+
 
   # LOAM feature threshold
   edgeThreshold: 1.0
@@ -70,9 +99,9 @@ lio_sam:
   surfFeatureMinValidNum: 100
 
   # voxel filter paprams
-  odometrySurfLeafSize: 0.2                     # default: 0.4 - outdoor, 0.2 - indoor
-  mappingCornerLeafSize: 0.1                    # default: 0.2 - outdoor, 0.1 - indoor
-  mappingSurfLeafSize: 0.2                      # default: 0.4 - outdoor, 0.2 - indoor
+  odometrySurfLeafSize: 0.4                     # default: 0.4 - outdoor, 0.2 - indoor
+  mappingCornerLeafSize: 0.2                    # default: 0.2 - outdoor, 0.1 - indoor
+  mappingSurfLeafSize: 0.4                      # default: 0.4 - outdoor, 0.2 - indoor
 
   # robot motion constraint (in case you are using a 2D robot)
   z_tollerance: 1000                            # meters
