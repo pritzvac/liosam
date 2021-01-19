@@ -76,7 +76,8 @@ public:
         nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
 
     pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
-    pubImuPath     = nh.advertise<nav_msgs::Path>("lio_sam/imu/path", 1);
+    /* ROS_WARN("pubImuOdometry topic: %s", pubImuOdometry.getTopic().c_str()); */
+    pubImuPath = nh.advertise<nav_msgs::Path>("lio_sam/imu/path", 1);
   }
   /*//}*/
 
@@ -133,46 +134,54 @@ public:
     pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
 
     // publish latest odometry
-    nav_msgs::Odometry laserOdometry    = imuOdomQueue.back();
-    laserOdometry.header.frame_id       = odometryFrame;
-    laserOdometry.child_frame_id        = baselinkFrame;
-    laserOdometry.pose.pose.position.x  = x;
-    laserOdometry.pose.pose.position.y  = y;
-    laserOdometry.pose.pose.position.z  = z;
-    laserOdometry.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
-    pubImuOdometry.publish(laserOdometry);
-
-    // publish tf
-    static tf::TransformBroadcaster tfOdom2BaseLink;
-    tf::Transform                   tCur;
-    tf::poseMsgToTF(laserOdometry.pose.pose, tCur);
+    tf::Transform tCur;
+    tCur.setOrigin(tf::Vector3(x, y, z));
+    tCur.setRotation(tf::createQuaternionFromRPY(roll, pitch, yaw));
     if (lidarFrame != baselinkFrame) {
       tCur = tCur * lidar2Baselink;
     }
-    tf::StampedTransform odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
-    tfOdom2BaseLink.sendTransform(odom_2_baselink);
+    tCur.setRotation(tCur.getRotation().normalized());
 
-    // publish IMU path
-    static nav_msgs::Path imuPath;
-    static double         last_path_time = -1;
-    double                imuTime        = imuOdomQueue.back().header.stamp.toSec();
-    if (imuTime - last_path_time > 0.1) {
-      last_path_time = imuTime;
-      geometry_msgs::PoseStamped pose_stamped;
-      pose_stamped.header.stamp    = imuOdomQueue.back().header.stamp;
-      pose_stamped.header.frame_id = odometryFrame;
-      pose_stamped.pose            = laserOdometry.pose.pose;
-      imuPath.poses.push_back(pose_stamped);
-      while (!imuPath.poses.empty() && imuPath.poses.front().header.stamp.toSec() < lidarOdomTime - 1.0) {
-        imuPath.poses.erase(imuPath.poses.begin());
-      }
-      if (pubImuPath.getNumSubscribers() != 0) {
-        imuPath.header.stamp    = imuOdomQueue.back().header.stamp;
-        imuPath.header.frame_id = odometryFrame;
-        pubImuPath.publish(imuPath);
+    nav_msgs::Odometry laserOdometry   = imuOdomQueue.back();
+    laserOdometry.header.frame_id      = odometryFrame;
+    laserOdometry.child_frame_id       = baselinkFrame;
+    laserOdometry.pose.pose.position.x = tCur.getOrigin().getX();
+    laserOdometry.pose.pose.position.y = tCur.getOrigin().getY();
+    laserOdometry.pose.pose.position.z = tCur.getOrigin().getZ();
+    tf::quaternionTFToMsg(tCur.getRotation(), laserOdometry.pose.pose.orientation);
+
+    if (std::isfinite(laserOdometry.pose.pose.orientation.x) && std::isfinite(laserOdometry.pose.pose.orientation.y) &&
+        std::isfinite(laserOdometry.pose.pose.orientation.z) && std::isfinite(laserOdometry.pose.pose.orientation.w)) {
+      pubImuOdometry.publish(laserOdometry);
+
+      // publish tf
+      static tf::TransformBroadcaster tfOdom2BaseLink;
+      tf::StampedTransform            odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
+      tfOdom2BaseLink.sendTransform(odom_2_baselink);
+
+      // publish IMU path
+      static nav_msgs::Path imuPath;
+      static double         last_path_time = -1;
+      double                imuTime        = imuOdomQueue.back().header.stamp.toSec();
+      if (imuTime - last_path_time > 0.1) {
+        last_path_time = imuTime;
+        geometry_msgs::PoseStamped pose_stamped;
+        pose_stamped.header.stamp    = imuOdomQueue.back().header.stamp;
+        pose_stamped.header.frame_id = odometryFrame;
+        pose_stamped.pose            = laserOdometry.pose.pose;
+        imuPath.poses.push_back(pose_stamped);
+        while (!imuPath.poses.empty() && imuPath.poses.front().header.stamp.toSec() < lidarOdomTime - 1.0) {
+          imuPath.poses.erase(imuPath.poses.begin());
+        }
+        if (pubImuPath.getNumSubscribers() != 0) {
+          imuPath.header.stamp    = imuOdomQueue.back().header.stamp;
+          imuPath.header.frame_id = odometryFrame;
+          pubImuPath.publish(imuPath);
+        }
       }
     }
-  } /*//}*/
+  }
+  /*//}*/
 };
 /*//}*/
 

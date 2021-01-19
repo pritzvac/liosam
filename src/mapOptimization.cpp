@@ -1594,16 +1594,43 @@ public:
 
   /*//{ publishOdometry() */
   void publishOdometry() {
-    // Publish odometry for ROS (global)
+    // transform from lidar to fcu frame
+    /* Eigen::Matrix4d T = Eigen::Matrix4d::Identity(); */
+    /* Eigen::Matrix4d T_lidar = Eigen::Matrix4d::Identity(); */
+
+    tf::Transform T;
+    tf::Transform T_lidar;
+
+    T.setOrigin(tf::Vector3(extTrans.x(), extTrans.y(), extTrans.z()));
+    T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI));
+
+    T_lidar.setOrigin(tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
+    T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));
+
+    tf::Transform T_odom = T * T_lidar;
+
+    // Publish in fcu frame
     nav_msgs::Odometry laserOdometryROS;
-    laserOdometryROS.header.stamp          = timeLaserInfoStamp;
-    laserOdometryROS.header.frame_id       = odometryFrame;
-    laserOdometryROS.child_frame_id        = baselinkFrame;
-    laserOdometryROS.pose.pose.position.x  = transformTobeMapped[3];
-    laserOdometryROS.pose.pose.position.y  = transformTobeMapped[4];
-    laserOdometryROS.pose.pose.position.z  = transformTobeMapped[5];
-    laserOdometryROS.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
+    laserOdometryROS.header.stamp         = timeLaserInfoStamp;
+    laserOdometryROS.header.frame_id      = odometryFrame;
+    laserOdometryROS.child_frame_id       = baselinkFrame;
+    laserOdometryROS.pose.pose.position.x = T_odom.getOrigin().getX();
+    laserOdometryROS.pose.pose.position.y = T_odom.getOrigin().getY();
+    laserOdometryROS.pose.pose.position.z = T_odom.getOrigin().getZ();
+    tf::quaternionTFToMsg(T_odom.getRotation(), laserOdometryROS.pose.pose.orientation);
     pubLaserOdometryGlobal.publish(laserOdometryROS);
+
+    // Publish odometry for ROS (global) in lidar frame
+    /* nav_msgs::Odometry laserOdometryROS; */
+    /* laserOdometryROS.header.stamp          = timeLaserInfoStamp; */
+    /* laserOdometryROS.header.frame_id       = odometryFrame; */
+    /* laserOdometryROS.child_frame_id        = baselinkFrame; */
+    /* laserOdometryROS.pose.pose.position.x  = transformTobeMapped[3]; */
+    /* laserOdometryROS.pose.pose.position.y  = transformTobeMapped[4]; */
+    /* laserOdometryROS.pose.pose.position.z  = transformTobeMapped[5]; */
+    /* laserOdometryROS.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
+     */
+    /* pubLaserOdometryGlobal.publish(laserOdometryROS); */
 
     // Publish TF
     /* static tf::TransformBroadcaster br; */
