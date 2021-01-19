@@ -200,9 +200,10 @@ public:
     timeScanEnd = timeScanCur + (float)laserCloudIn->points.back().t / 1000000000.0;  // Ouster
 
     // check dense flag
-    if (laserCloudIn->is_dense == false) {
-      ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!");
-      ros::shutdown();
+    if (!laserCloudIn->is_dense) {
+      removeNaNFromPointCloud(laserCloudIn, laserCloudIn);
+      /* ROS_ERROR("Point cloud is not in dense format, please remove NaN points first!"); */
+      /* ros::shutdown(); */
     }
 
     // check ring channel
@@ -564,7 +565,36 @@ public:
     cloudInfo.cloud_deskewed = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
     pubLaserCloudInfo.publish(cloudInfo);
   }
+
+  /*//{ removeNaNFromPointCloud() */
+  void removeNaNFromPointCloud(const pcl::PointCloud<PointXYZIRT>::Ptr &cloud_in, pcl::PointCloud<PointXYZIRT>::Ptr &cloud_out) {
+
+    if (cloud_in->is_dense) {
+      cloud_out = cloud_in;
+      return;
+    }
+
+    unsigned int k = 0;
+
+    cloud_out->resize(cloud_in->size());
+
+    for (unsigned int i = 0; i < cloud_in->size(); i++) {
+
+      if (std::isfinite(cloud_in->at(i).x) && std::isfinite(cloud_in->at(i).y) && std::isfinite(cloud_in->at(i).z)) {
+        cloud_out->at(k++) = cloud_in->at(i);
+      }
+    }
+
+    cloud_out->header   = cloud_in->header;
+    cloud_out->is_dense = true;
+
+    if (cloud_in->size() != k) {
+      cloud_out->resize(k);
+    }
+  }
+  /*//}*/
 };
+
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "lio_sam");
