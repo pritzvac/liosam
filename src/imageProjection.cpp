@@ -1,7 +1,6 @@
 #include "utility.h"
 #include "lio_sam/cloud_info.h"
 
-// Velodyne
 struct PointXYZIRT
 {
   PCL_ADD_POINT4D
@@ -189,7 +188,7 @@ public:
     }
 
     // convert cloud
-    currentCloudMsg = cloudQueue.front();
+    currentCloudMsg = std::move(cloudQueue.front());
     cloudQueue.pop_front();
     pcl::fromROSMsg(currentCloudMsg, *laserCloudIn);
 
@@ -197,7 +196,7 @@ public:
     cloudHeader = currentCloudMsg.header;
     timeScanCur = cloudHeader.stamp.toSec();
     /* timeScanEnd = timeScanCur + laserCloudIn->points.back().time; // Velodyne */
-    timeScanEnd = timeScanCur + (float)laserCloudIn->points.back().t / 1000000000.0;  // Ouster
+    timeScanEnd = timeScanCur + (float)laserCloudIn->points.back().t / 1.0e9;  // Ouster
 
     // check dense flag
     if (!laserCloudIn->is_dense) {
@@ -210,8 +209,8 @@ public:
     static int ringFlag = 0;
     if (ringFlag == 0) {
       ringFlag = -1;
-      for (int i = 0; i < (int)currentCloudMsg.fields.size(); ++i) {
-        if (currentCloudMsg.fields[i].name == "ring") {
+      for (auto &field : currentCloudMsg.fields) {
+        if (field.name == "ring") {
           ringFlag = 1;
           break;
         }
@@ -225,8 +224,8 @@ public:
     // check point time
     if (deskewFlag == 0) {
       deskewFlag = -1;
-      for (int i = 0; i < (int)currentCloudMsg.fields.size(); ++i) {
-        if (currentCloudMsg.fields[i].name == timeField) {
+      for (auto &field : currentCloudMsg.fields) {
+        if (field.name == timeField) {
           deskewFlag = 1;
           break;
         }
