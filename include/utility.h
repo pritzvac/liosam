@@ -57,6 +57,7 @@ using namespace std;
 
 typedef pcl::PointXYZI PointType;
 
+/*//{ class ParamServer() */
 class ParamServer {
 public:
   ros::NodeHandle nh;
@@ -256,7 +257,7 @@ public:
     return imu_out;
   }
 };
-
+/*//}*/
 
 sensor_msgs::PointCloud2 publishCloud(ros::Publisher *thisPub, pcl::PointCloud<PointType>::Ptr thisCloud, ros::Time thisStamp, std::string thisFrame) {
   sensor_msgs::PointCloud2 tempCloud;

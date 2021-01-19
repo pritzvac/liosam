@@ -14,6 +14,7 @@ struct by_value
   }
 };
 
+/*//{ class FeatureExtraction() */
 class FeatureExtraction : public ParamServer {
 
 public:
@@ -37,6 +38,8 @@ public:
   int *                     cloudNeighborPicked;
   int *                     cloudLabel;
 
+public:
+  /*//{ FeatureExtraction() */
   FeatureExtraction() {
     subLaserCloudInfo =
         nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
@@ -47,7 +50,9 @@ public:
 
     initializationValue();
   }
+  /*//}*/
 
+  /*//{ initializationValue() */
   void initializationValue() {
     cloudSmoothness.resize(N_SCAN * Horizon_SCAN);
 
@@ -61,7 +66,9 @@ public:
     cloudNeighborPicked = new int[N_SCAN * Horizon_SCAN];
     cloudLabel          = new int[N_SCAN * Horizon_SCAN];
   }
+  /*//}*/
 
+  /*//{ laserCloudInfoHandler() */
   void laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr &msgIn) {
     cloudInfo   = *msgIn;                                     // new cloud info
     cloudHeader = msgIn->header;                              // new cloud header
@@ -75,7 +82,9 @@ public:
 
     publishFeatureCloud();
   }
+  /*//}*/
 
+  /*//{ calculateSmoothness() */
   void calculateSmoothness() {
     int cloudSize = extractedCloud->points.size();
     for (int i = 5; i < cloudSize - 5; i++) {
@@ -92,7 +101,9 @@ public:
       cloudSmoothness[i].ind   = i;
     }
   }
+  /*//}*/
 
+  /*//{ markOccludedPoints() */
   void markOccludedPoints() {
     int cloudSize = extractedCloud->points.size();
     // mark occluded points and parallel beam points
@@ -129,7 +140,9 @@ public:
       }
     }
   }
+  /*//}*/
 
+  /*//{ extractFeatures() */
   void extractFeatures() {
     cornerCloud->clear();
     surfaceCloud->clear();
@@ -223,14 +236,18 @@ public:
       *surfaceCloud += *surfaceCloudScanDS;
     }
   }
+  /*//}*/
 
+  /*//{ freeCloudInfoMemory() */
   void freeCloudInfoMemory() {
     cloudInfo.startRingIndex.clear();
     cloudInfo.endRingIndex.clear();
     cloudInfo.pointColInd.clear();
     cloudInfo.pointRange.clear();
   }
+  /*//}*/
 
+  /*//{ publishFeatureCloud() */
   void publishFeatureCloud() {
     // free cloud info memory
     freeCloudInfoMemory();
@@ -240,8 +257,9 @@ public:
     // publish to mapOptimization
     pubLaserCloudInfo.publish(cloudInfo);
   }
+  /*//}*/
 };
-
+/*//}*/
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "lio_sam");

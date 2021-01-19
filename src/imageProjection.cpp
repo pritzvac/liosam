@@ -13,27 +13,9 @@ struct PointXYZIRT
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity,
                                                                                        intensity)(uint32_t, t, t)(uint8_t, ring, ring)(uint32_t, range, range))
-
-// Ouster
-/* struct PointXYZIRT { */
-/*   PCL_ADD_POINT4D; */
-/*   float intensity; */
-/*   uint32_t t; */
-/*   uint16_t reflectivity; */
-/*   uint8_t ring; */
-/*   uint16_t noise; */
-/*   uint32_t range; */
-/*   EIGEN_MAKE_ALIGNED_OPERATOR_NEW */
-/* }EIGEN_ALIGN16; */
-
-/* POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, */
-/*   (float, x, x) (float, y, y) (float, z, z) (float, intensity, intensity) */
-/*   (uint32_t, t, t) (uint16_t, reflectivity, reflectivity) */
-/*   (uint8_t, ring, ring) (uint16_t, noise, noise) (uint32_t, range, range) */
-/*   ) */
-
 const int queueLength = 2000;
 
+/*//{ class ImageProjection() */
 class ImageProjection : public ParamServer {
 private:
   std::mutex imuLock;
@@ -82,6 +64,7 @@ private:
 
 
 public:
+  /*//{ ImageProjection() */
   ImageProjection() : deskewFlag(0) {
     subImu  = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
     subOdom = nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
@@ -95,7 +78,14 @@ public:
 
     pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
   }
+  /*//}*/
 
+  /*//{ ~ImageProjection() */
+  ~ImageProjection() {
+  }
+  /*//}*/
+
+  /*//{ allocateMemory() */
   void allocateMemory() {
     laserCloudIn.reset(new pcl::PointCloud<PointXYZIRT>());
     fullCloud.reset(new pcl::PointCloud<PointType>());
@@ -111,7 +101,9 @@ public:
 
     resetParameters();
   }
+  /*//}*/
 
+  /*//{ resetParameters() */
   void resetParameters() {
     laserCloudIn->clear();
     extractedCloud->clear();
@@ -129,10 +121,9 @@ public:
       imuRotZ[i] = 0;
     }
   }
+  /*//}*/
 
-  ~ImageProjection() {
-  }
-
+  /*//{ imuHandler() */
   void imuHandler(const sensor_msgs::Imu::ConstPtr &imuMsg) {
     sensor_msgs::Imu thisImu = imuConverter(*imuMsg);
 
@@ -156,12 +147,16 @@ public:
     /* cout << "IMU roll pitch yaw: " << endl; */
     /* cout << "roll: " << imuRoll << ", pitch: " << imuPitch << ", yaw: " << imuYaw << endl << endl; */
   }
+  /*//}*/
 
+  /*//{ odometryHandler() */
   void odometryHandler(const nav_msgs::Odometry::ConstPtr &odometryMsg) {
     std::lock_guard<std::mutex> lock2(odoLock);
     odomQueue.push_back(*odometryMsg);
   }
+  /*//}*/
 
+  /*//{ cloudHandler() */
   void cloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg) {
     if (!cachePointCloud(laserCloudMsg)) {
       return;
@@ -179,7 +174,9 @@ public:
 
     resetParameters();
   }
+  /*//}*/
 
+  /*//{ cachePointCloud() */
   bool cachePointCloud(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg) {
     // cache point cloud
     cloudQueue.push_back(*laserCloudMsg);
@@ -236,7 +233,9 @@ public:
 
     return true;
   }
+  /*//}*/
 
+  /*//{ deskewInfo() */
   bool deskewInfo() {
     std::lock_guard<std::mutex> lock1(imuLock);
     std::lock_guard<std::mutex> lock2(odoLock);
@@ -259,7 +258,9 @@ public:
 
     return true;
   }
+  /*//}*/
 
+  /*//{ imuDeskewInfo() */
   void imuDeskewInfo() {
     cloudInfo.imuAvailable = false;
 
@@ -320,7 +321,9 @@ public:
 
     cloudInfo.imuAvailable = true;
   }
+  /*//}*/
 
+  /*//{ odomDeskewInfo() */
   void odomDeskewInfo() {
     cloudInfo.odomAvailable = false;
 
@@ -407,7 +410,9 @@ public:
 
     odomDeskewFlag = true;
   }
+  /*//}*/
 
+  /*//{ findRotation() */
   void findRotation(double pointTime, float *rotXCur, float *rotYCur, float *rotZCur) {
     *rotXCur = 0;
     *rotYCur = 0;
@@ -434,7 +439,9 @@ public:
       *rotZCur              = imuRotZ[imuPointerFront] * ratioFront + imuRotZ[imuPointerBack] * ratioBack;
     }
   }
+  /*//}*/
 
+  /*//{ findPosition() */
   void findPosition(double relTime, float *posXCur, float *posYCur, float *posZCur) {
     *posXCur = 0;
     *posYCur = 0;
@@ -451,7 +458,9 @@ public:
     // *posYCur = ratio * odomIncreY;
     // *posZCur = ratio * odomIncreZ;
   }
+  /*//}*/
 
+  /*//{ deskewPoint() */
   PointType deskewPoint(PointType *point, double relTime) {
     if (deskewFlag == -1 || cloudInfo.imuAvailable == false) {
       return *point;
@@ -482,7 +491,9 @@ public:
 
     return newPoint;
   }
+  /*//}*/
 
+  /*//{ projectPointCloud() */
   void projectPointCloud() {
     const int cloudSize = laserCloudIn->points.size();
     // range image projection
@@ -535,7 +546,9 @@ public:
       fullCloud->points[index] = thisPoint;
     }
   }
+  /*//}*/
 
+  /*//{ cloudExtraction() */
   void cloudExtraction() {
     int count = 0;
     // extract segmented cloud for lidar odometry
@@ -558,12 +571,15 @@ public:
       cloudInfo.endRingIndex[i] = count - 1 - 5;
     }
   }
+  /*//}*/
 
+  /*//{ publishClouds() */
   void publishClouds() {
     cloudInfo.header         = cloudHeader;
     cloudInfo.cloud_deskewed = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
     pubLaserCloudInfo.publish(cloudInfo);
   }
+  /*//}*/
 
   /*//{ removeNaNFromPointCloud() */
   void removeNaNFromPointCloud(const pcl::PointCloud<PointXYZIRT>::Ptr &cloud_in, pcl::PointCloud<PointXYZIRT>::Ptr &cloud_out) {
@@ -593,7 +609,7 @@ public:
   }
   /*//}*/
 };
-
+/*//}*/
 
 int main(int argc, char **argv) {
   ros::init(argc, argv, "lio_sam");
