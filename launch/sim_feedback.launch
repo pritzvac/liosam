@@ -1,0 +1,42 @@
+<launch>
+
+    <arg name="project" default="lio_sam"/>
+
+    <!--//{ DATA PROCESSING NODELET -->
+    <!-- <arg name="lidar3d/min_range" default="0.6" /> -->
+    <!-- <arg name="lidar3d/max_range" default="30.0" /> -->
+    <!-- <arg name="lidar3d/publish_cloud_over_max_range" default="true" /> -->
+    <!-- <arg name="lidar3d/filter/intensity" default="false" /> -->
+    <!-- <arg name="lidar3d/filter/intensity/value" default="100" /> -->
+    <!-- <arg name="lidar3d/filter/intensity/range" default="10.0" /> -->
+
+    <!-- <include file="$(find mrs_pcl_tools)/launch/uav_os1_filtration.launch"> -->
+    <!--   <arg name="nodelet" value="standalone" /> -->
+    <!--   <arg name="nodelet_manager" value="" /> -->
+    <!--   <arg name="launch_prefix" value="" /> -->
+
+    <!--   <!-1- Ouster -1-> -->
+    <!--   <arg name="lidar3d_republish" value="true" /> -->
+    <!--   <arg name="lidar3d_topic_in" value="/uav1/os_cloud_nodelet/points" /> -->
+    <!--   <arg name="lidar3d_publish_cloud_over_max_range" value="$(eval arg('lidar3d/publish_cloud_over_max_range'))" /> -->
+    <!--   <arg name="lidar3d_min_range" value="$(arg lidar3d/min_range)" /> -->
+    <!--   <arg name="lidar3d_max_range" value="$(arg lidar3d/max_range)" /> -->
+    <!--   <arg name="lidar3d_filter_intensity_en" value="$(arg lidar3d/filter/intensity)" /> -->
+    <!--   <arg name="lidar3d_filter_intensity_thrd" value="$(arg lidar3d/filter/intensity/value)" /> -->
+    <!--   <arg name="lidar3d_filter_intensity_range" value="$(arg lidar3d/filter/intensity/range)" /> -->
+    <!-- </include> -->
+    <!--//}-->
+
+    <!-- Parameters -->
+    <rosparam file="$(find lio_sam)/config/sim.yaml" command="load" />
+
+    <!--- LOAM -->
+    <include file="$(find lio_sam)/launch/include/module_loam.launch" />
+
+    <!--- Robot State TF -->
+    <!-- <include file="$(find lio_sam)/launch/include/module_robot_state_publisher.launch" /> -->
+
+    <!--- Run Rviz-->
+    <include file="$(find lio_sam)/launch/include/module_rviz.launch" />
+
+</launch>

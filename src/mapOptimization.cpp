@@ -1601,8 +1601,10 @@ public:
     tf::Transform T;
     tf::Transform T_lidar;
 
+    // TODO: Load this as static TF
     T.setOrigin(tf::Vector3(extTrans.x(), extTrans.y(), extTrans.z()));
-    T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI));
+    /* T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI)); // os_lidar -> os_sensor */ 
+    T.setRotation(tf::createQuaternionFromRPY(0, 0, 0)); // os_sensor -> fcu
 
     T_lidar.setOrigin(tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
     T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));

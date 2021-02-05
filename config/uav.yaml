@@ -3,12 +3,12 @@ lio_sam:
   imuType: "vio_imu" # {os1_imu, mavros_imu, vio_imu, xsens_imu}
 
   # Topics
-  pointCloudTopic: "/uav68/os1_cloud_node/points"            # Point cloud data
+  pointCloudTopic: "/uav68/os_cloud_nodelet/points"            # Point cloud data
   odomTopic: "/uav68/lio_sam/odometry/imu"                   # IMU pre-preintegration odometry, same frequency as IMU
   gpsTopic: "none"                                           # GPS odometry topic from navsat, see module_navsat.launch file
 
   # Frames
-  lidarFrame: "uav68/os1_lidar"
+  lidarFrame: "uav68/os_sensor"
   baselinkFrame: "uav68/fcu"
   odometryFrame: "uav68/lio_sam_origin"
   mapFrame: "uav68/lio_sam_mapping_origin"

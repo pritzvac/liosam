@@ -3,15 +3,15 @@ lio_sam:
   imuType: "mavros_imu" # {os1_imu, mavros_imu, vio_imu, xsens_imu}
 
   # Topics
-  pointCloudTopic: "/uav1/os1_cloud_node/points_processed"  # Point cloud data
+  pointCloudTopic: "/uav1/os_cloud_nodelet/points_processed"  # Point cloud data
   odomTopic: "/uav1/lio_sam/odometry/imu"                   # IMU pre-preintegration odometry, same frequency as IMU
   gpsTopic: "none"                                          # GPS odometry topic from navsat, see module_navsat.launch file
 
   # Frames
-  lidarFrame: "uav1/os1_lidar"
+  lidarFrame: "uav1/os_sensor"
   baselinkFrame: "uav1/fcu"
-  odometryFrame: "uav1/lio_sam_origin"
-  mapFrame: "uav1/lio_sam_mapping_origin"
+  odometryFrame: "uav1/aloam_origin"
+  mapFrame: "uav1/aloam_mapping_origin"
 
   # GPS Settings
   useImuHeadingInitialization: false          # if using GPS data, set to "true"
@@ -37,16 +37,16 @@ lio_sam:
  
   # Mavros IMU real
   mavros_imu:
-    imuTopic: "/uav1/mavros/imu/data_filt"
+    imuTopic: "/uav1/mavros/imu/data"
     imuRPYWeight: 0.01
     imuAccNoise: 0.006
     imuGyrNoise: 0.00018665
     imuAccBiasN: 0.006
     imuGyrBiasN: 0.000038785
     # lidar -> imu tf
-    extrinsicTrans: [0.0, 0.0, 0.1]
-    extrinsicRot: [-1, 0, 0,
-                   0, -1, 0,
+    extrinsicTrans: [0.0, 0.0, -0.1]
+    extrinsicRot: [1, 0, 0,
+                   0, 1, 0,
                    0, 0, 1]
 
   # Ouster IMU
@@ -109,7 +109,7 @@ lio_sam:
 
   # CPU Params
   numberOfCores: 8                              # number of cores for mapping optimization
-  mappingProcessInterval: 0.15                  # seconds, regulate mapping frequency
+  mappingProcessInterval: 0.10                  # seconds, regulate mapping frequency
 
   # Surrounding map
   surroundingkeyframeAddingDistThreshold: 1.0   # meters, regulate keyframe adding threshold
