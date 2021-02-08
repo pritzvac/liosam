@@ -106,10 +106,12 @@ public:
 
   /*//{ imuOdometryHandler() */
   void imuOdometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg) {
-    // static tf
+    // TODO: publish TFs correctly as `map -> odom -> fcu` (control has to handle this by continuously republishing the reference in map frame)
+
+    // publish tf map->odom (inverted tf-tree)
     static tf::TransformBroadcaster tfMap2Odom;
     static tf::Transform            map_to_odom = tf::Transform(tf::createQuaternionFromRPY(0, 0, 0), tf::Vector3(0, 0, 0));
-    tfMap2Odom.sendTransform(tf::StampedTransform(map_to_odom, odomMsg->header.stamp, mapFrame, odometryFrame));
+    tfMap2Odom.sendTransform(tf::StampedTransform(map_to_odom.inverse(), odomMsg->header.stamp, odometryFrame, mapFrame));
 
     std::lock_guard<std::mutex> lock(mtx);
 
@@ -154,9 +156,9 @@ public:
         std::isfinite(laserOdometry.pose.pose.orientation.z) && std::isfinite(laserOdometry.pose.pose.orientation.w)) {
       pubImuOdometry.publish(laserOdometry);
 
-      // publish tf
+      // publish tf odom->fcu (inverted tf-tree)
       static tf::TransformBroadcaster tfOdom2BaseLink;
-      tf::StampedTransform            odom_2_baselink = tf::StampedTransform(tCur, odomMsg->header.stamp, odometryFrame, baselinkFrame);
+      tf::StampedTransform            odom_2_baselink = tf::StampedTransform(tCur.inverse(), odomMsg->header.stamp, baselinkFrame, odometryFrame);
       tfOdom2BaseLink.sendTransform(odom_2_baselink);
 
       // publish IMU path

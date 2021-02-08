@@ -1620,6 +1620,7 @@ public:
     laserOdometryROS.pose.pose.position.y = T_odom.getOrigin().getY();
     laserOdometryROS.pose.pose.position.z = T_odom.getOrigin().getZ();
     tf::quaternionTFToMsg(T_odom.getRotation(), laserOdometryROS.pose.pose.orientation);
+    // ODOM: M -> FCU
     pubLaserOdometryGlobal.publish(laserOdometryROS);
 
     // Publish odometry for ROS (global) in lidar frame
