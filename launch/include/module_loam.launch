@@ -1,11 +1,21 @@
 <launch>
 
-    <arg name="project" default="lio_sam"/>
-    <arg name="launch_prefix" default=""/>
-    
-    <node pkg="$(arg project)" type="$(arg project)_imuPreintegration"   name="$(arg project)_imuPreintegration" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
-    <node pkg="$(arg project)" type="$(arg project)_imageProjection"     name="$(arg project)_imageProjection"   output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
-    <node pkg="$(arg project)" type="$(arg project)_featureExtraction"   name="$(arg project)_featureExtraction" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
-    <node pkg="$(arg project)" type="$(arg project)_mapOptimization"      name="$(arg project)_mapOptimization"  output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
+  <arg name="uav_name" default="$(env UAV_NAME)" />
+  <arg name="config_file" default="" />
+  <arg name="project" default="lio_sam"/>
+
+  <arg name="launch_prefix" default=""/>
+
+  <!-- Parameters -->
+  <rosparam file="$(find lio_sam)/config/default.yaml" command="load" />
+  <!-- Load a user param file -->
+  <rosparam if="$(eval not arg('config_file') == '')" file="$(arg config_file)" />
+  <rosparam param="uav_name" subst_value="True">$(arg uav_name)</rosparam>
+
+  <!-- LIO_SAM nodes -->
+  <node pkg="$(arg project)" type="$(arg project)_imuPreintegration" name="$(arg project)_imuPreintegration" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
+  <node pkg="$(arg project)" type="$(arg project)_imageProjection"   name="$(arg project)_imageProjection"   output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
+  <node pkg="$(arg project)" type="$(arg project)_featureExtraction" name="$(arg project)_featureExtraction" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
+  <node pkg="$(arg project)" type="$(arg project)_mapOptimization"   name="$(arg project)_mapOptimization"   output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" />
     
 </launch>

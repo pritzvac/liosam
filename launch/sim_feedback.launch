@@ -1,6 +1,7 @@
 <launch>
 
-    <arg name="project" default="lio_sam"/>
+    <arg name="uav_name" default="$(env UAV_NAME)"/>
+    <arg name="rviz" default="false"/>
 
     <!--//{ DATA PROCESSING NODELET -->
     <!-- <arg name="lidar3d/min_range" default="0.6" /> -->
@@ -27,16 +28,17 @@
     <!-- </include> -->
     <!--//}-->
 
-    <!-- Parameters -->
-    <rosparam file="$(find lio_sam)/config/sim.yaml" command="load" />
+  <group ns="$(arg uav_name)">
 
     <!--- LOAM -->
-    <include file="$(find lio_sam)/launch/include/module_loam.launch" />
-
-    <!--- Robot State TF -->
-    <!-- <include file="$(find lio_sam)/launch/include/module_robot_state_publisher.launch" /> -->
-
+    <include file="$(find lio_sam)/launch/include/module_loam.launch" >
+      <arg name="config_file" value="$(find lio_sam)/config/sim.yaml" />
+    </include>
+    
     <!--- Run Rviz-->
-    <include file="$(find lio_sam)/launch/include/module_rviz.launch" />
+    <include if="$(arg rviz)" file="$(find lio_sam)/launch/include/module_rviz.launch" />
+
+  </group>
+
 
 </launch>

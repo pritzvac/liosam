@@ -5,6 +5,10 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -pthread")
 set(CMAKE_CXX_FLAGS_RELDEB "${CMAKE_CXX_FLAGS_RELDEB} -pthread")
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 find_package(catkin REQUIRED COMPONENTS
   tf
   roscpp
@@ -19,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   message_generation
   visualization_msgs
+  mrs_lib
 )
 
 find_package(OpenMP REQUIRED)
@@ -53,6 +58,7 @@ catkin_package(
   message_runtime 
   message_generation
   visualization_msgs
+  mrs_lib
 )
 
 # add definitions

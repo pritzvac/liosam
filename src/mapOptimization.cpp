@@ -160,12 +160,12 @@ public:
     subCloud =
         nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
     subGPS  = nh.subscribe<nav_msgs::Odometry>(gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
-    subLoop = nh.subscribe<std_msgs::Float64MultiArray>("lio_loop/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this,
+    subLoop = nh.subscribe<std_msgs::Float64MultiArray>("lio_sam/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this,
                                                         ros::TransportHints().tcpNoDelay());
 
     pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
     pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_corrected_cloud", 1);
-    pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("/lio_sam/mapping/loop_closure_constraints", 1);
+    pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("lio_sam/mapping/loop_closure_constraints", 1);
 
     pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/map_local", 1);
     pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/cloud_registered", 1);
@@ -1602,9 +1602,9 @@ public:
     tf::Transform T_lidar;
 
     // TODO: Load this as static TF
-    T.setOrigin(tf::Vector3(extTrans.x(), extTrans.y(), extTrans.z()));
-    /* T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI)); // os_lidar -> os_sensor */ 
-    T.setRotation(tf::createQuaternionFromRPY(0, 0, 0)); // os_sensor -> fcu
+    T.setOrigin(tf::Vector3(extTrans(0, 0), extTrans(1, 0), extTrans(2, 0)));
+    /* T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI)); // os_lidar -> os_sensor */
+    T.setRotation(tf::createQuaternionFromRPY(0, 0, 0));  // os_sensor -> fcu
 
     T_lidar.setOrigin(tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
     T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));

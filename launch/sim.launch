@@ -1,6 +1,12 @@
 <launch>
+  
+    <arg name="uav_name" default="$(env UAV_NAME)"/>
+    <arg name="rviz" default="false"/>
 
-    <arg name="project" default="lio_sam"/>
+    <arg name="frame_lidar" default="$(arg uav_name)/os_sensor" />
+    <arg name="frame_baselink" default="$(arg uav_name)/fcu" />
+    <arg name="frame_odom" default="$(arg uav_name)/aloam_origin" />
+    <arg name="frame_map" default="$(arg uav_name)/aloam_mapping_origin" />
     
     <!-- Parameters -->
     <rosparam file="$(find lio_sam)/config/sim.yaml" command="load" />
@@ -12,6 +18,6 @@
     <!-- <include file="$(find lio_sam)/launch/include/module_robot_state_publisher.launch" /> -->
 
     <!--- Run Rviz-->
-    <include file="$(find lio_sam)/launch/include/module_rviz.launch" />
+    <include if="$(arg rviz)" file="$(find lio_sam)/launch/include/module_rviz.launch" />
 
 </launch>
