@@ -1,14 +1,21 @@
 #!/bin/bash
 
-WORKSPACE_PATH=$GIT_PATH/workspace
+wget -O ~/tmp/gtsam.zip https://github.com/borglab/gtsam/archive/4.0.2.zip
+cd ~/tmp/ && unzip gtsam.zip -d ~/tmp/
+cd ~/tmp/gtsam-4.0.2/
+mkdir build && cd build
+cmake -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF ..
+sudo make install -j4
 
-# Releases can be found at: https://github.com/borglab/gtsam
-GTSAM_VERSION=4.0.3
+# WORKSPACE_PATH=$GIT_PATH/workspace
 
-# checkout GTSAM_VERSION (ideally stable)
-cd $GIT_PATH
-[ ! -d "gtsam" ] && git clone https://github.com/borglab/gtsam.git # clone if was not cloned before
-cd $GIT_PATH/gtsam && git checkout $GTSAM_VERSION
+# # Releases can be found at: https://github.com/borglab/gtsam
+# GTSAM_VERSION=4.0.3
 
-# link gtsam to workspace
-ln -s $GIT_PATH/gtsam $WORKSPACE_PATH/src/.
+# # checkout GTSAM_VERSION (ideally stable)
+# cd $GIT_PATH
+# [ ! -d "gtsam" ] && git clone https://github.com/borglab/gtsam.git # clone if was not cloned before
+# cd $GIT_PATH/gtsam && git checkout $GTSAM_VERSION
+
+# # link gtsam to workspace
+# ln -s $GIT_PATH/gtsam $WORKSPACE_PATH/src/.
