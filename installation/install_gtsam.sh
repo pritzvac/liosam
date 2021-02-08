@@ -1,9 +1,17 @@
 #!/bin/bash
 
-wget -O ~/Downloads/gtsam.zip https://github.com/borglab/gtsam/archive/4.0.2.zip
-cd ~/Downloads/ && unzip gtsam.zip -d ~/Downloads/
-cd ~/Downloads/gtsam-4.0.2/
-mkdir build && cd build
+GTSAM_PATH=~/Downloads
+
+if [ ! -d $GTSAM_PATH/gtsam-4.0.2 ]
+then
+  wget -O $GTSAM_PATH/gtsam.zip https://github.com/borglab/gtsam/archive/4.0.2.zip
+  cd $GTSAM_PATH && unzip gtsam.zip -d $GTSAM_PATH
+fi
+
+cd $GTSAM_PATH/gtsam-4.0.2/
+
+[ ! -d "build" ] && mkdir build
+cd build
 cmake -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF ..
 sudo make install -j4
 
