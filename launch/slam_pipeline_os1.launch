@@ -92,7 +92,7 @@
   <!--//}-->
 
   <!--//{ OS1 DRIVER NODELET (UAV ONLY) -->
-  <include if="$(eval arg('RUN_TYPE') == 'uav')" file="$(find os1_driver)/launch/uav.launch" >
+  <include if="$(eval arg('RUN_TYPE') == 'uav')" file="$(find ouster_ros)/launch/uav.launch" >
     <arg name="nodelet" value="$(arg nodelet)" />
     <arg name="nodelet_manager" value="$(arg nodelet_manager)" />
   </include>
