@@ -1,6 +1,11 @@
 #!/bin/bash
 
-WORKSPACE_PATH=$GIT_PATH/workspace
+if [[ $# -eq 1 ]]
+then
+  WORKSPACE_PATH=$1
+else
+  WORKSPACE_PATH=$GIT_PATH/workspace
+fi
 
 # Releases can be found at: https://github.com/borglab/gtsam
 GTSAM_VERSION=4.0.3
