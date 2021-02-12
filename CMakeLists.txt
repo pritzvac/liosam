@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   cv_bridge
+  nodelet
   # pcl library
   pcl_conversions
   # msgs
@@ -90,21 +91,67 @@ link_directories(
 ###########
 
 # Range Image Projection
-add_executable(${PROJECT_NAME}_imageProjection src/imageProjection.cpp)
-add_dependencies(${PROJECT_NAME}_imageProjection ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_imageProjection ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${Boost_LIBRARIES} ${GTSAM_LIBRARIES})
+add_library(ImageProjection src/imageProjection.cpp)
+add_dependencies(ImageProjection
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_link_libraries(ImageProjection
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  )
 
 # Feature Association
-add_executable(${PROJECT_NAME}_featureExtraction src/featureExtraction.cpp)
-add_dependencies(${PROJECT_NAME}_featureExtraction ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
-target_link_libraries(${PROJECT_NAME}_featureExtraction ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${Boost_LIBRARIES} ${GTSAM_LIBRARIES})
+add_library(FeatureExtraction src/featureExtraction.cpp)
+add_dependencies(FeatureExtraction
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_link_libraries(FeatureExtraction
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  )
 
 # Mapping Optimization
-add_executable(${PROJECT_NAME}_mapOptimization src/mapOptimization.cpp)
-add_dependencies(${PROJECT_NAME}_mapOptimization ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_generate_messages_cpp)
-target_compile_options(${PROJECT_NAME}_mapOptimization PRIVATE ${OpenMP_CXX_FLAGS})
-target_link_libraries(${PROJECT_NAME}_mapOptimization ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${OpenMP_CXX_FLAGS} ${Boost_LIBRARIES} ${GTSAM_LIBRARIES} gtsam)
+add_library(MapOptimization src/mapOptimization.cpp)
+add_dependencies(MapOptimization
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_compile_options(MapOptimization
+  PRIVATE
+  ${OpenMP_CXX_FLAGS}
+  )
+target_link_libraries(MapOptimization
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  gtsam
+  )
 
 # IMU Preintegration
-add_executable(${PROJECT_NAME}_imuPreintegration src/imuPreintegration.cpp)
-target_link_libraries(${PROJECT_NAME}_imuPreintegration ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OpenCV_LIBRARIES} ${Boost_LIBRARIES} ${GTSAM_LIBRARIES} gtsam)
+add_library(ImuPreintegration src/imuPreintegration.cpp)
+add_dependencies(ImuPreintegration
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_link_libraries(ImuPreintegration
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  gtsam
+  )

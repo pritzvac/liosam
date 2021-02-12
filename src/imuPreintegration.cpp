@@ -20,6 +20,11 @@ using gtsam::symbol_shorthand::B;  // Bias  (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Vel   (xdot,ydot,zdot)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
+namespace lio_sam
+{
+namespace imu_preintegration
+{
+
 /*//{ class TransformFusion() */
 class TransformFusion : public ParamServer {
 public:
@@ -187,8 +192,8 @@ public:
 };
 /*//}*/
 
-/*//{ class IMUPreintegration() */
-class IMUPreintegration : public ParamServer {
+/*//{ class ImuPreintegrationImpl() */
+class ImuPreintegrationImpl : public ParamServer {
 public:
   std::mutex mtx;
 
@@ -236,10 +241,10 @@ public:
   gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(extTrans(0, 0), extTrans(1, 0), extTrans(2, 0)));
 
 public:
-  /*//{ IMUPreintegration() */
-  IMUPreintegration() {
-    subImu      = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &IMUPreintegration::imuHandler, this, ros::TransportHints().tcpNoDelay());
-    subOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 5, &IMUPreintegration::odometryHandler, this,
+  /*//{ ImuPreintegrationImpl() */
+  ImuPreintegrationImpl() {
+    subImu      = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImuPreintegrationImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
+    subOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 5, &ImuPreintegrationImpl::odometryHandler, this,
                                                    ros::TransportHints().tcpNoDelay());
 
     pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 2000);
@@ -551,17 +556,27 @@ public:
 };
 /*//}*/
 
-int main(int argc, char** argv) {
-  ros::init(argc, argv, "lio_sam");
+/* //{ class ImuPreintegration */
 
-  IMUPreintegration ImuP;
+class ImuPreintegration : public nodelet::Nodelet {
 
-  TransformFusion TF;
+public:
+  virtual void onInit() {
+    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+    IP                  = std::make_unique<ImuPreintegrationImpl>();
+    TF                  = std::make_unique<TransformFusion>();
+    ROS_INFO("\033[1;32m----> IMU Preintegration Started.\033[0m");
+  };
 
-  ROS_INFO("\033[1;32m----> IMU Preintegration Started.\033[0m");
+private:
+  std::shared_ptr<ImuPreintegrationImpl> IP;
+  std::shared_ptr<TransformFusion>       TF;
+};
 
-  ros::MultiThreadedSpinner spinner(4);
-  spinner.spin();
+//}
 
-  return 0;
-}
+}  // namespace imu_preintegration
+}  // namespace lio_sam
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(lio_sam::imu_preintegration::ImuPreintegration, nodelet::Nodelet)

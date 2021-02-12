@@ -1,6 +1,7 @@
 #pragma once
 
 #include <ros/ros.h>
+#include <nodelet/nodelet.h>
 
 #include <std_msgs/Header.h>
 #include <std_msgs/Float64MultiArray.h>

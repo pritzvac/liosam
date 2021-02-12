@@ -42,8 +42,13 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRPYT, (float, x, x)(float, y, y)(floa
 
 typedef PointXYZIRPYT PointTypePose;
 
-/*//{ class mapOptimization() */
-class mapOptimization : public ParamServer {
+namespace lio_sam
+{
+namespace map_optimization
+{
+
+/*//{ class MapOptimizationImpl() */
+class MapOptimizationImpl : public ParamServer {
 
 public:
   // gtsam
@@ -144,8 +149,8 @@ public:
   Eigen::Affine3f incrementalOdometryAffineBack;
 
 public:
-  /*//{ mapOptimization() */
-  mapOptimization() {
+  /*//{ MapOptimizationImpl() */
+  MapOptimizationImpl() {
     ISAM2Params parameters;
     parameters.relinearizeThreshold = 0.1;
     parameters.relinearizeSkip      = 1;
@@ -157,10 +162,10 @@ public:
     pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 1);
     pubPath                     = nh.advertise<nav_msgs::Path>("lio_sam/mapping/path", 1);
 
-    subCloud =
-        nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &mapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-    subGPS  = nh.subscribe<nav_msgs::Odometry>(gpsTopic, 200, &mapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
-    subLoop = nh.subscribe<std_msgs::Float64MultiArray>("lio_sam/loop_closure_detection", 1, &mapOptimization::loopInfoHandler, this,
+    subCloud = nh.subscribe<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1, &MapOptimizationImpl::laserCloudInfoHandler, this,
+                                                 ros::TransportHints().tcpNoDelay());
+    subGPS   = nh.subscribe<nav_msgs::Odometry>(gpsTopic, 200, &MapOptimizationImpl::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+    subLoop  = nh.subscribe<std_msgs::Float64MultiArray>("lio_sam/loop_closure_detection", 1, &MapOptimizationImpl::loopInfoHandler, this,
                                                         ros::TransportHints().tcpNoDelay());
 
     pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/mapping/icp_loop_closure_history_cloud", 1);
@@ -1729,20 +1734,31 @@ public:
 };
 /*//}*/
 
-int main(int argc, char** argv) {
-  ros::init(argc, argv, "lio_sam");
+/* //{ class MapOptimization */
 
-  mapOptimization MO;
+class MapOptimization : public nodelet::Nodelet {
 
-  ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
+public:
+  virtual void onInit() {
+    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+    MO                  = std::make_unique<MapOptimizationImpl>();
+    ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
 
-  std::thread loopthread(&mapOptimization::loopClosureThread, &MO);
-  std::thread visualizeMapThread(&mapOptimization::visualizeGlobalMapThread, &MO);
+    std::thread loopthread(&MapOptimizationImpl::loopClosureThread, MO);
+    std::thread visualizeMapThread(&MapOptimizationImpl::visualizeGlobalMapThread, MO);
 
-  ros::spin();
+    loopthread.detach();
+    visualizeMapThread.detach();
+  };
 
-  loopthread.join();
-  visualizeMapThread.join();
+private:
+  std::shared_ptr<MapOptimizationImpl> MO;
+};
 
-  return 0;
-}
+//}
+
+}  // namespace map_optimization
+}  // namespace lio_sam
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(lio_sam::map_optimization::MapOptimization, nodelet::Nodelet)

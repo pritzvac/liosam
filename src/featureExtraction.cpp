@@ -1,6 +1,11 @@
 #include "utility.h"
 #include "lio_sam/cloud_info.h"
 
+namespace lio_sam
+{
+namespace feature_extraction
+{
+
 struct smoothness_t
 {
   float  value;
@@ -14,8 +19,8 @@ struct by_value
   }
 };
 
-/*//{ class FeatureExtraction() */
-class FeatureExtraction : public ParamServer {
+/*//{ class FeatureExtractionImpl() */
+class FeatureExtractionImpl : public ParamServer {
 
 public:
   ros::Subscriber subLaserCloudInfo;
@@ -39,10 +44,10 @@ public:
   int *                     cloudLabel;
 
 public:
-  /*//{ FeatureExtraction() */
-  FeatureExtraction() {
-    subLaserCloudInfo =
-        nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+  /*//{ FeatureExtractionImpl() */
+  FeatureExtractionImpl() {
+    subLaserCloudInfo = nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtractionImpl::laserCloudInfoHandler, this,
+                                                          ros::TransportHints().tcpNoDelay());
 
     pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1);
     pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_corner", 1);
@@ -261,14 +266,25 @@ public:
 };
 /*//}*/
 
-int main(int argc, char **argv) {
-  ros::init(argc, argv, "lio_sam");
+/* //{ class FeatureExtraction */
 
-  FeatureExtraction FE;
+class FeatureExtraction : public nodelet::Nodelet {
 
-  ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
+public:
+  virtual void onInit() {
+    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+    FE                  = std::make_unique<FeatureExtractionImpl>();
+    ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
+  };
 
-  ros::spin();
+private:
+  std::shared_ptr<FeatureExtractionImpl> FE;
+};
 
-  return 0;
-}
+//}
+
+}  // namespace feature_extraction
+}  // namespace lio_sam
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(lio_sam::feature_extraction::FeatureExtraction, nodelet::Nodelet)

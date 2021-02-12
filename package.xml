@@ -1,50 +1,39 @@
 <?xml version="1.0"?>
-<package>
+<package format="2">
+
   <name>lio_sam</name>
   <version>1.0.0</version>
-  <description>Lidar Odometry</description>
+  <description>Laser-inertial odometry by Tixiao Shan</description>
 
-  <maintainer email="shant@mit.edu">Tixiao Shan</maintainer>
+  <maintainer email="petrapa6@fel.cvut.cz">Pavel Petracek</maintainer>
+  <author>Tixiao Shan (shant@mit.edu)</author>
 
   <license>TODO</license>
 
-  <author>Tixiao Shan</author>
-
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>roscpp</build_depend>
-  <run_depend>roscpp</run_depend>
-  <build_depend>rospy</build_depend>
-  <run_depend>rospy</run_depend>
-  
-  <build_depend>tf</build_depend>
-  <run_depend>tf</run_depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>nodelet</depend>
+  <depend>tf</depend>
+  <depend>cv_bridge</depend>
+  <depend>pcl_conversions</depend>
 
-  <build_depend>cv_bridge</build_depend>
-  <run_depend>cv_bridge</run_depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>visualization_msgs</depend>
 
-  <build_depend>pcl_conversions</build_depend>
-  <run_depend>pcl_conversions</run_depend>
 
-  <build_depend>std_msgs</build_depend>
-  <run_depend>std_msgs</run_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <run_depend>sensor_msgs</run_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <run_depend>geometry_msgs</run_depend>
-  <build_depend>nav_msgs</build_depend>
-  <run_depend>nav_msgs</run_depend>
-  <build_depend>visualization_msgs</build_depend>
-  <run_depend>visualization_msgs</run_depend>
-  <build_depend>mrs_lib</build_depend>
-  <run_depend>mrs_lib</run_depend>
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
 
-  <build_depend>message_generation</build_depend>
-  <run_depend>message_generation</run_depend>
-  <build_depend>message_runtime</build_depend>
-  <run_depend>message_runtime</run_depend>
+  <depend>mrs_lib</depend>
+  <depend>GTSAM</depend>
 
-  <build_depend>GTSAM</build_depend>
-  <run_depend>GTSAM</run_depend>
+  <export>
+    <nodelet plugin="${prefix}/plugins.xml" />
+  </export>
 
 </package>

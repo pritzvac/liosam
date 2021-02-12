@@ -13,10 +13,16 @@ struct PointXYZIRT
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity,
                                                                                        intensity)(uint32_t, t, t)(uint8_t, ring, ring)(uint32_t, range, range))
+
+namespace lio_sam
+{
+namespace image_projection
+{
+
 const int queueLength = 2000;
 
-/*//{ class ImageProjection() */
-class ImageProjection : public ParamServer {
+/*//{ class ImageProjectionImpl() */
+class ImageProjectionImpl : public ParamServer {
 private:
   std::mutex imuLock;
   std::mutex odoLock;
@@ -64,11 +70,12 @@ private:
 
 
 public:
-  /*//{ ImageProjection() */
-  ImageProjection() : deskewFlag(0) {
-    subImu  = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
-    subOdom = nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
-    subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+  /*//{ ImageProjectionImpl() */
+  ImageProjectionImpl() : deskewFlag(0) {
+    subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjectionImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
+    subOdom =
+        nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjectionImpl::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+    subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjectionImpl::cloudHandler, this, ros::TransportHints().tcpNoDelay());
 
     pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/deskew/cloud_deskewed", 1);
     pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1);
@@ -80,8 +87,8 @@ public:
   }
   /*//}*/
 
-  /*//{ ~ImageProjection() */
-  ~ImageProjection() {
+  /*//{ ~ImageProjectionImpl() */
+  ~ImageProjectionImpl() {
   }
   /*//}*/
 
@@ -611,15 +618,25 @@ public:
 };
 /*//}*/
 
-int main(int argc, char **argv) {
-  ros::init(argc, argv, "lio_sam");
+/* //{ class ImageProjection */
 
-  ImageProjection IP;
+class ImageProjection : public nodelet::Nodelet {
 
-  ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
+public:
+  virtual void onInit() {
+    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
+    IP                  = std::make_unique<ImageProjectionImpl>();
+    ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
+  };
 
-  ros::MultiThreadedSpinner spinner(3);
-  spinner.spin();
+private:
+  std::shared_ptr<ImageProjectionImpl> IP;
+};
 
-  return 0;
-}
+//}
+
+}  // namespace image_projection
+}  // namespace lio_sam
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(lio_sam::image_projection::ImageProjection, nodelet::Nodelet)
