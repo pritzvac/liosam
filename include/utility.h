@@ -282,14 +282,21 @@ public:
 /*//}*/
 
 sensor_msgs::PointCloud2 publishCloud(ros::Publisher *thisPub, pcl::PointCloud<PointType>::Ptr thisCloud, ros::Time thisStamp, std::string thisFrame) {
-  sensor_msgs::PointCloud2 tempCloud;
-  pcl::toROSMsg(*thisCloud, tempCloud);
-  tempCloud.header.stamp    = thisStamp;
-  tempCloud.header.frame_id = thisFrame;
-  if (thisPub->getNumSubscribers() != 0) {
-    thisPub->publish(tempCloud);
+
+  sensor_msgs::PointCloud2::Ptr tempCloud = boost::make_shared<sensor_msgs::PointCloud2>();
+  pcl::toROSMsg(*thisCloud, *tempCloud);
+  tempCloud->header.stamp    = thisStamp;
+  tempCloud->header.frame_id = thisFrame;
+
+  if (thisPub->getNumSubscribers() > 0) {
+    try {
+      thisPub->publish(tempCloud);
+    }
+    catch (...) {
+      ROS_ERROR("[LioSam]: Exception caught during publishing topic %s.", thisPub->getTopic().c_str());
+    }
   }
-  return tempCloud;
+  return *tempCloud;
 }
 
 template <typename T>

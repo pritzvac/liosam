@@ -149,16 +149,16 @@ public:
     }
     tCur.setRotation(tCur.getRotation().normalized());
 
-    nav_msgs::Odometry laserOdometry   = imuOdomQueue.back();
-    laserOdometry.header.frame_id      = odometryFrame;
-    laserOdometry.child_frame_id       = baselinkFrame;
-    laserOdometry.pose.pose.position.x = tCur.getOrigin().getX();
-    laserOdometry.pose.pose.position.y = tCur.getOrigin().getY();
-    laserOdometry.pose.pose.position.z = tCur.getOrigin().getZ();
-    tf::quaternionTFToMsg(tCur.getRotation(), laserOdometry.pose.pose.orientation);
+    nav_msgs::Odometry::Ptr laserOdometry = boost::make_shared<nav_msgs::Odometry>(imuOdomQueue.back());
+    laserOdometry->header.frame_id        = odometryFrame;
+    laserOdometry->child_frame_id         = baselinkFrame;
+    laserOdometry->pose.pose.position.x   = tCur.getOrigin().getX();
+    laserOdometry->pose.pose.position.y   = tCur.getOrigin().getY();
+    laserOdometry->pose.pose.position.z   = tCur.getOrigin().getZ();
+    tf::quaternionTFToMsg(tCur.getRotation(), laserOdometry->pose.pose.orientation);
 
-    if (std::isfinite(laserOdometry.pose.pose.orientation.x) && std::isfinite(laserOdometry.pose.pose.orientation.y) &&
-        std::isfinite(laserOdometry.pose.pose.orientation.z) && std::isfinite(laserOdometry.pose.pose.orientation.w)) {
+    if (std::isfinite(laserOdometry->pose.pose.orientation.x) && std::isfinite(laserOdometry->pose.pose.orientation.y) &&
+        std::isfinite(laserOdometry->pose.pose.orientation.z) && std::isfinite(laserOdometry->pose.pose.orientation.w)) {
       pubImuOdometry.publish(laserOdometry);
 
       // publish tf odom->fcu (inverted tf-tree)
@@ -167,22 +167,22 @@ public:
       tfOdom2BaseLink.sendTransform(odom_2_baselink);
 
       // publish IMU path
-      static nav_msgs::Path imuPath;
-      static double         last_path_time = -1;
-      double                imuTime        = imuOdomQueue.back().header.stamp.toSec();
+      static nav_msgs::Path::Ptr imuPath        = boost::make_shared<nav_msgs::Path>();
+      static double              last_path_time = -1;
+      double                     imuTime        = imuOdomQueue.back().header.stamp.toSec();
       if (imuTime - last_path_time > 0.1) {
         last_path_time = imuTime;
         geometry_msgs::PoseStamped pose_stamped;
         pose_stamped.header.stamp    = imuOdomQueue.back().header.stamp;
         pose_stamped.header.frame_id = odometryFrame;
-        pose_stamped.pose            = laserOdometry.pose.pose;
-        imuPath.poses.push_back(pose_stamped);
-        while (!imuPath.poses.empty() && imuPath.poses.front().header.stamp.toSec() < lidarOdomTime - 1.0) {
-          imuPath.poses.erase(imuPath.poses.begin());
+        pose_stamped.pose            = laserOdometry->pose.pose;
+        imuPath->poses.push_back(pose_stamped);
+        while (!imuPath->poses.empty() && imuPath->poses.front().header.stamp.toSec() < lidarOdomTime - 1.0) {
+          imuPath->poses.erase(imuPath->poses.begin());
         }
-        if (pubImuPath.getNumSubscribers() != 0) {
-          imuPath.header.stamp    = imuOdomQueue.back().header.stamp;
-          imuPath.header.frame_id = odometryFrame;
+        if (pubImuPath.getNumSubscribers() > 0) {
+          imuPath->header.stamp    = imuOdomQueue.back().header.stamp;
+          imuPath->header.frame_id = odometryFrame;
           pubImuPath.publish(imuPath);
         }
       }
@@ -294,7 +294,7 @@ public:
   void odometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg) {
     std::lock_guard<std::mutex> lock(mtx);
 
-    double currentCorrectionTime = ROS_TIME(odomMsg);
+    const double currentCorrectionTime = ROS_TIME(odomMsg);
 
     // make sure we have imu data to integrate
     if (imuQueOpt.empty()) {
@@ -527,29 +527,29 @@ public:
     gtsam::NavState currentState = imuIntegratorImu_->predict(prevStateOdom, prevBiasOdom);
 
     // publish odometry
-    nav_msgs::Odometry odometry;
-    odometry.header.stamp    = thisImu.header.stamp;
-    odometry.header.frame_id = odometryFrame;
-    odometry.child_frame_id  = baselinkFrame;
+    nav_msgs::Odometry::Ptr odometry = boost::make_shared<nav_msgs::Odometry>();
+    odometry->header.stamp           = thisImu.header.stamp;
+    odometry->header.frame_id        = odometryFrame;
+    odometry->child_frame_id         = baselinkFrame;
 
     // transform imu pose to ldiar
     gtsam::Pose3 imuPose   = gtsam::Pose3(currentState.quaternion(), currentState.position());
     gtsam::Pose3 lidarPose = imuPose.compose(imu2Lidar);
 
-    odometry.pose.pose.position.x    = lidarPose.translation().x();
-    odometry.pose.pose.position.y    = lidarPose.translation().y();
-    odometry.pose.pose.position.z    = lidarPose.translation().z();
-    odometry.pose.pose.orientation.x = lidarPose.rotation().toQuaternion().x();
-    odometry.pose.pose.orientation.y = lidarPose.rotation().toQuaternion().y();
-    odometry.pose.pose.orientation.z = lidarPose.rotation().toQuaternion().z();
-    odometry.pose.pose.orientation.w = lidarPose.rotation().toQuaternion().w();
+    odometry->pose.pose.position.x    = lidarPose.translation().x();
+    odometry->pose.pose.position.y    = lidarPose.translation().y();
+    odometry->pose.pose.position.z    = lidarPose.translation().z();
+    odometry->pose.pose.orientation.x = lidarPose.rotation().toQuaternion().x();
+    odometry->pose.pose.orientation.y = lidarPose.rotation().toQuaternion().y();
+    odometry->pose.pose.orientation.z = lidarPose.rotation().toQuaternion().z();
+    odometry->pose.pose.orientation.w = lidarPose.rotation().toQuaternion().w();
 
-    odometry.twist.twist.linear.x  = currentState.velocity().x();
-    odometry.twist.twist.linear.y  = currentState.velocity().y();
-    odometry.twist.twist.linear.z  = currentState.velocity().z();
-    odometry.twist.twist.angular.x = thisImu.angular_velocity.x + prevBiasOdom.gyroscope().x();
-    odometry.twist.twist.angular.y = thisImu.angular_velocity.y + prevBiasOdom.gyroscope().y();
-    odometry.twist.twist.angular.z = thisImu.angular_velocity.z + prevBiasOdom.gyroscope().z();
+    odometry->twist.twist.linear.x  = currentState.velocity().x();
+    odometry->twist.twist.linear.y  = currentState.velocity().y();
+    odometry->twist.twist.linear.z  = currentState.velocity().z();
+    odometry->twist.twist.angular.x = thisImu.angular_velocity.x + prevBiasOdom.gyroscope().x();
+    odometry->twist.twist.angular.y = thisImu.angular_velocity.y + prevBiasOdom.gyroscope().y();
+    odometry->twist.twist.angular.z = thisImu.angular_velocity.z + prevBiasOdom.gyroscope().z();
     pubImuOdometry.publish(odometry);
   }
   /*//}*/

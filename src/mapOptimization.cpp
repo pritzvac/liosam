@@ -142,7 +142,7 @@ public:
   vector<gtsam::noiseModel::Diagonal::shared_ptr> loopNoiseQueue;
   deque<std_msgs::Float64MultiArray>              loopInfoVec;
 
-  nav_msgs::Path globalPath;
+  nav_msgs::Path::Ptr globalPath = boost::make_shared<nav_msgs::Path>();
 
   Eigen::Affine3f transPointAssociateToMap;
   Eigen::Affine3f incrementalOdometryAffineFront;
@@ -231,7 +231,7 @@ public:
   /*//}*/
 
   /*//{ laserCloudInfoHandler() */
-  void laserCloudInfoHandler(const lio_sam::cloud_infoConstPtr& msgIn) {
+  void laserCloudInfoHandler(const lio_sam::cloud_info::ConstPtr& msgIn) {
     // extract time stamp
     timeLaserInfoStamp = msgIn->header.stamp;
     timeLaserInfoCur   = msgIn->header.stamp.toSec();
@@ -687,11 +687,11 @@ public:
 
   /*//{ visualizeLoopClosure() */
   void visualizeLoopClosure() {
-    if (loopIndexContainer.empty()) {
+    if (loopIndexContainer.empty() || pubLoopConstraintEdge.getNumSubscribers() == 0) {
       return;
     }
 
-    visualization_msgs::MarkerArray markerArray;
+    visualization_msgs::MarkerArray::Ptr markerArray = boost::make_shared<visualization_msgs::MarkerArray>();
     // loop nodes
     visualization_msgs::Marker markerNode;
     markerNode.header.frame_id    = odometryFrame;
@@ -739,9 +739,14 @@ public:
       markerEdge.points.push_back(p);
     }
 
-    markerArray.markers.push_back(markerNode);
-    markerArray.markers.push_back(markerEdge);
-    pubLoopConstraintEdge.publish(markerArray);
+    markerArray->markers.push_back(markerNode);
+    markerArray->markers.push_back(markerEdge);
+    try {
+      pubLoopConstraintEdge.publish(markerArray);
+    }
+    catch (...) {
+      ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubLoopConstraintEdge.getTopic().c_str());
+    }
   }
   /*//}*/
 
@@ -1556,7 +1561,7 @@ public:
       // clear map cache
       laserCloudMapContainer.clear();
       // clear path
-      globalPath.poses.clear();
+      globalPath->poses.clear();
       // update key poses
       int numPoses = isamCurrentEstimate.size();
       for (int i = 0; i < numPoses; ++i) {
@@ -1593,7 +1598,7 @@ public:
     pose_stamped.pose.orientation.z = q.z();
     pose_stamped.pose.orientation.w = q.w();
 
-    globalPath.poses.push_back(pose_stamped);
+    globalPath->poses.push_back(pose_stamped);
   }
   /*//}*/
 
@@ -1617,16 +1622,21 @@ public:
     tf::Transform T_odom = T * T_lidar;
 
     // Publish in fcu frame
-    nav_msgs::Odometry laserOdometryROS;
-    laserOdometryROS.header.stamp         = timeLaserInfoStamp;
-    laserOdometryROS.header.frame_id      = odometryFrame;
-    laserOdometryROS.child_frame_id       = baselinkFrame;
-    laserOdometryROS.pose.pose.position.x = T_odom.getOrigin().getX();
-    laserOdometryROS.pose.pose.position.y = T_odom.getOrigin().getY();
-    laserOdometryROS.pose.pose.position.z = T_odom.getOrigin().getZ();
-    tf::quaternionTFToMsg(T_odom.getRotation(), laserOdometryROS.pose.pose.orientation);
+    nav_msgs::Odometry::Ptr laserOdometryROS = boost::make_shared<nav_msgs::Odometry>();
+    laserOdometryROS->header.stamp           = timeLaserInfoStamp;
+    laserOdometryROS->header.frame_id        = odometryFrame;
+    laserOdometryROS->child_frame_id         = baselinkFrame;
+    laserOdometryROS->pose.pose.position.x   = T_odom.getOrigin().getX();
+    laserOdometryROS->pose.pose.position.y   = T_odom.getOrigin().getY();
+    laserOdometryROS->pose.pose.position.z   = T_odom.getOrigin().getZ();
+    tf::quaternionTFToMsg(T_odom.getRotation(), laserOdometryROS->pose.pose.orientation);
     // ODOM: M -> FCU
-    pubLaserOdometryGlobal.publish(laserOdometryROS);
+    try {
+      pubLaserOdometryGlobal.publish(laserOdometryROS);
+    }
+    catch (...) {
+      ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubLaserOdometryGlobal.getTopic().c_str());
+    }
 
     // Publish odometry for ROS (global) in lidar frame
     /* nav_msgs::Odometry laserOdometryROS; */
@@ -1649,9 +1659,9 @@ public:
     /* br.sendTransform(trans_odom_to_lidar); */
 
     // Publish odometry for ROS (incremental)
-    static bool               lastIncreOdomPubFlag = false;
-    static nav_msgs::Odometry laserOdomIncremental;  // incremental odometry msg
-    static Eigen::Affine3f    increOdomAffine;       // incremental odometry in affine
+    static bool                    lastIncreOdomPubFlag = false;
+    static nav_msgs::Odometry::Ptr laserOdomIncremental = boost::make_shared<nav_msgs::Odometry>();  // incremental odometry msg
+    static Eigen::Affine3f         increOdomAffine;                                                  // incremental odometry in affine
     if (lastIncreOdomPubFlag == false) {
       lastIncreOdomPubFlag = true;
       laserOdomIncremental = laserOdometryROS;
@@ -1681,20 +1691,25 @@ public:
           pitch = pitchMid;
         }
       }
-      laserOdomIncremental.header.stamp          = timeLaserInfoStamp;
-      laserOdomIncremental.header.frame_id       = odometryFrame;
-      laserOdomIncremental.child_frame_id        = baselinkFrame;
-      laserOdomIncremental.pose.pose.position.x  = x;
-      laserOdomIncremental.pose.pose.position.y  = y;
-      laserOdomIncremental.pose.pose.position.z  = z;
-      laserOdomIncremental.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+      laserOdomIncremental->header.stamp          = timeLaserInfoStamp;
+      laserOdomIncremental->header.frame_id       = odometryFrame;
+      laserOdomIncremental->child_frame_id        = baselinkFrame;
+      laserOdomIncremental->pose.pose.position.x  = x;
+      laserOdomIncremental->pose.pose.position.y  = y;
+      laserOdomIncremental->pose.pose.position.z  = z;
+      laserOdomIncremental->pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
       if (isDegenerate) {
-        laserOdomIncremental.pose.covariance[0] = 1;
+        laserOdomIncremental->pose.covariance[0] = 1;
       } else {
-        laserOdomIncremental.pose.covariance[0] = 0;
+        laserOdomIncremental->pose.covariance[0] = 0;
       }
     }
-    pubLaserOdometryIncremental.publish(laserOdomIncremental);
+    try {
+      pubLaserOdometryIncremental.publish(laserOdomIncremental);
+    }
+    catch (...) {
+      ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubLaserOdometryIncremental.getTopic().c_str());
+    }
   }
   /*//}*/
 
@@ -1723,11 +1738,18 @@ public:
       *cloudOut                = *transformPointCloud(cloudOut, &thisPose6D);
       publishCloud(&pubCloudRegisteredRaw, cloudOut, timeLaserInfoStamp, odometryFrame);
     }
+
     // publish path
-    if (pubPath.getNumSubscribers() != 0) {
-      globalPath.header.stamp    = timeLaserInfoStamp;
-      globalPath.header.frame_id = odometryFrame;
-      pubPath.publish(globalPath);
+    if (pubPath.getNumSubscribers() > 0) {
+      globalPath->header.stamp    = timeLaserInfoStamp;
+      globalPath->header.frame_id = odometryFrame;
+
+      try {
+        pubPath.publish(globalPath);
+      }
+      catch (...) {
+        ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubPath.getTopic().c_str());
+      }
     }
   }
   /*//}*/

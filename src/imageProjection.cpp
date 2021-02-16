@@ -63,10 +63,10 @@ private:
   float odomIncreY;
   float odomIncreZ;
 
-  lio_sam::cloud_info cloudInfo;
-  double              timeScanCur;
-  double              timeScanEnd;
-  std_msgs::Header    cloudHeader;
+  lio_sam::cloud_info::Ptr cloudInfo = boost::make_shared<lio_sam::cloud_info>();
+  double                   timeScanCur;
+  double                   timeScanEnd;
+  std_msgs::Header         cloudHeader;
 
 
 public:
@@ -100,11 +100,11 @@ public:
 
     fullCloud->points.resize(N_SCAN * Horizon_SCAN);
 
-    cloudInfo.startRingIndex.assign(N_SCAN, 0);
-    cloudInfo.endRingIndex.assign(N_SCAN, 0);
+    cloudInfo->startRingIndex.assign(N_SCAN, 0);
+    cloudInfo->endRingIndex.assign(N_SCAN, 0);
 
-    cloudInfo.pointColInd.assign(N_SCAN * Horizon_SCAN, 0);
-    cloudInfo.pointRange.assign(N_SCAN * Horizon_SCAN, 0);
+    cloudInfo->pointColInd.assign(N_SCAN * Horizon_SCAN, 0);
+    cloudInfo->pointRange.assign(N_SCAN * Horizon_SCAN, 0);
 
     resetParameters();
   }
@@ -132,7 +132,7 @@ public:
 
   /*//{ imuHandler() */
   void imuHandler(const sensor_msgs::Imu::ConstPtr &imuMsg) {
-    sensor_msgs::Imu thisImu = imuConverter(*imuMsg);
+    const sensor_msgs::Imu thisImu = imuConverter(*imuMsg);
 
     std::lock_guard<std::mutex> lock1(imuLock);
     imuQueue.push_back(thisImu);
@@ -164,7 +164,7 @@ public:
   /*//}*/
 
   /*//{ cloudHandler() */
-  void cloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg) {
+  void cloudHandler(const sensor_msgs::PointCloud2::ConstPtr &laserCloudMsg) {
     if (!cachePointCloud(laserCloudMsg)) {
       return;
     }
@@ -269,7 +269,7 @@ public:
 
   /*//{ imuDeskewInfo() */
   void imuDeskewInfo() {
-    cloudInfo.imuAvailable = false;
+    cloudInfo->imuAvailable = false;
 
     while (!imuQueue.empty()) {
       if (imuQueue.front().header.stamp.toSec() < timeScanCur - 0.01) {
@@ -291,7 +291,7 @@ public:
 
       // get roll, pitch, and yaw estimation for this scan
       if (currentImuTime <= timeScanCur) {
-        imuRPY2rosRPY(&thisImuMsg, &cloudInfo.imuRollInit, &cloudInfo.imuPitchInit, &cloudInfo.imuYawInit);
+        imuRPY2rosRPY(&thisImuMsg, &cloudInfo->imuRollInit, &cloudInfo->imuPitchInit, &cloudInfo->imuYawInit);
       }
 
       if (currentImuTime > timeScanEnd + 0.01) {
@@ -326,13 +326,13 @@ public:
       return;
     }
 
-    cloudInfo.imuAvailable = true;
+    cloudInfo->imuAvailable = true;
   }
   /*//}*/
 
   /*//{ odomDeskewInfo() */
   void odomDeskewInfo() {
-    cloudInfo.odomAvailable = false;
+    cloudInfo->odomAvailable = false;
 
     while (!odomQueue.empty()) {
       if (odomQueue.front().header.stamp.toSec() < timeScanCur - 0.01) {
@@ -370,14 +370,14 @@ public:
     tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
 
     // Initial guess used in mapOptimization
-    cloudInfo.initialGuessX     = startOdomMsg.pose.pose.position.x;
-    cloudInfo.initialGuessY     = startOdomMsg.pose.pose.position.y;
-    cloudInfo.initialGuessZ     = startOdomMsg.pose.pose.position.z;
-    cloudInfo.initialGuessRoll  = roll;
-    cloudInfo.initialGuessPitch = pitch;
-    cloudInfo.initialGuessYaw   = yaw;
+    cloudInfo->initialGuessX     = startOdomMsg.pose.pose.position.x;
+    cloudInfo->initialGuessY     = startOdomMsg.pose.pose.position.y;
+    cloudInfo->initialGuessZ     = startOdomMsg.pose.pose.position.z;
+    cloudInfo->initialGuessRoll  = roll;
+    cloudInfo->initialGuessPitch = pitch;
+    cloudInfo->initialGuessYaw   = yaw;
 
-    cloudInfo.odomAvailable = true;
+    cloudInfo->odomAvailable = true;
 
     // get end odometry at the end of the scan
     odomDeskewFlag = false;
@@ -456,7 +456,7 @@ public:
 
     // If the sensor moves relatively slow, like walking speed, positional deskew seems to have little benefits. Thus code below is commented.
 
-    // if (cloudInfo.odomAvailable == false || odomDeskewFlag == false)
+    // if (cloudInfo->odomAvailable == false || odomDeskewFlag == false)
     //     return;
 
     // float ratio = relTime / (timeScanEnd - timeScanCur);
@@ -469,7 +469,7 @@ public:
 
   /*//{ deskewPoint() */
   PointType deskewPoint(PointType *point, double relTime) {
-    if (deskewFlag == -1 || cloudInfo.imuAvailable == false) {
+    if (deskewFlag == -1 || cloudInfo->imuAvailable == false) {
       return *point;
     }
 
@@ -560,31 +560,36 @@ public:
     int count = 0;
     // extract segmented cloud for lidar odometry
     for (int i = 0; i < N_SCAN; ++i) {
-      cloudInfo.startRingIndex[i] = count - 1 + 5;
+      cloudInfo->startRingIndex[i] = count - 1 + 5;
 
       for (int j = 0; j < Horizon_SCAN; ++j) {
         /* ROS_WARN("i: %d, j: %d, rangeMat: %0.10f, isFltMax: %d", i, j, rangeMat.at<float>(i,j), rangeMat.at<float>(i,j) == FLT_MAX); */
         if (rangeMat.at<float>(i, j) != FLT_MAX) {
           // mark the points' column index for marking occlusion later
-          cloudInfo.pointColInd[count] = j;
+          cloudInfo->pointColInd[count] = j;
           // save range info
-          cloudInfo.pointRange[count] = rangeMat.at<float>(i, j);
+          cloudInfo->pointRange[count] = rangeMat.at<float>(i, j);
           // save extracted cloud
           extractedCloud->push_back(fullCloud->points[j + i * Horizon_SCAN]);
           // size of extracted cloud
           ++count;
         }
       }
-      cloudInfo.endRingIndex[i] = count - 1 - 5;
+      cloudInfo->endRingIndex[i] = count - 1 - 5;
     }
   }
   /*//}*/
 
   /*//{ publishClouds() */
   void publishClouds() {
-    cloudInfo.header         = cloudHeader;
-    cloudInfo.cloud_deskewed = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
-    pubLaserCloudInfo.publish(cloudInfo);
+    cloudInfo->header         = cloudHeader;
+    cloudInfo->cloud_deskewed = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
+    try {
+      pubLaserCloudInfo.publish(cloudInfo);
+    }
+    catch (...) {
+      ROS_ERROR("[LioSam|IP]: Exception caught during publishing topic %s.", pubLaserCloudInfo.getTopic().c_str());
+    }
   }
   /*//}*/
 
