@@ -47,8 +47,7 @@ public:
     if (lidarFrame != baselinkFrame) {
 
       bool tf_found = false;
-      for (int i = 0; i < 5; i++) {
-
+      while (!tf_found) {
         try {
           tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
           tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
@@ -58,16 +57,18 @@ public:
           /* tf_tmp.setOrigin(lidar2Baselink.getOrigin()); */
           /* lidar2Baselink.setData(tf_tmp); */
           tf_found = true;
-          break;
         }
         catch (tf::TransformException ex) {
+          ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
         }
       }
 
-      if (!tf_found) {
-        ROS_ERROR("no transform found from: %s, to: %s. Ending!", lidarFrame.c_str(), baselinkFrame.c_str());
-        ros::shutdown();
-      }
+      ROS_INFO("Found transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+
+    } else {
+
+      lidar2Baselink.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+      lidar2Baselink.setRotation(tf::createQuaternionFromRPY(0.0, 0.0, 0.0));
     }
 
     subLaserOdometry =
