@@ -189,8 +189,6 @@ public:
     cloudQueue.pop_front();
     pcl::fromROSMsg(currentCloudMsg, *laserCloudIn);
 
-    const int cloudSize = laserCloudIn->points.size();
-
     // get timestamp
     cloudHeader = currentCloudMsg.header;
     timeScanCur = cloudHeader.stamp.toSec();
@@ -499,59 +497,57 @@ public:
   /*//{ projectPointCloud() */
   void projectPointCloud() {
     // range image projection
-    for (int rowIdn = 0; rowIdn < (int)laserCloudIn->height; rowIdn++) {
-      for (int j = 0; j < (int)laserCloudIn->width; j++) {
+    const unsigned int cloudSize = laserCloudIn->points.size();
+    for (unsigned int i = 0; i < cloudSize; i++) {
+      /* ROS_WARN("(%d, %d) - xyz: (%0.2f, %0.2f, %0.2f), ring: %d", j, rowIdn, laserCloudIn->at(j, rowIdn).x, laserCloudIn->at(j, rowIdn).y, */
+      /*          laserCloudIn->at(j, rowIdn).z, laserCloudIn->at(j, rowIdn).ring); */
 
-        /* ROS_WARN("(%d, %d) - xyz: (%0.2f, %0.2f, %0.2f), ring: %d", j, rowIdn, laserCloudIn->at(j, rowIdn).x, laserCloudIn->at(j, rowIdn).y, */
-        /*          laserCloudIn->at(j, rowIdn).z, laserCloudIn->at(j, rowIdn).ring); */
-
-        PointType thisPoint;
-        thisPoint.x         = laserCloudIn->at(j, rowIdn).x;
-        thisPoint.y         = laserCloudIn->at(j, rowIdn).y;
-        thisPoint.z         = laserCloudIn->at(j, rowIdn).z;
-        thisPoint.intensity = laserCloudIn->at(j, rowIdn).intensity;
-
-        const float range = pointDistance(thisPoint);
-        /* const float range = laserCloudIn->at(j, rowIdn).range / 1000.0f; */
-        if (range < lidarMinRange || range > lidarMaxRange) {
-          continue;
-        }
-
-        /* const int rowIdn = laserCloudIn->at(j, rowIdn).ring; */
-        if (rowIdn < 0 || rowIdn >= N_SCAN) {
-          /* ROS_ERROR("Invalid ring: %d", rowIdn); */
-          continue;
-        }
-
-        if (rowIdn % downsampleRate != 0) {
-          /* ROS_ERROR("Downsampling. Throwing away row: %d", rowIdn); */
-          continue;
-        }
-
-        // TODO: polish this monstrosity
-        const float  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
-        static float ang_res_x    = 360.0 / float(Horizon_SCAN);
-        int          columnIdn    = -round((horizonAngle - 90.0) / ang_res_x) + Horizon_SCAN / 2;
-        if (columnIdn >= Horizon_SCAN) {
-          columnIdn -= Horizon_SCAN;
-        }
-
-        if (columnIdn < 0 || columnIdn >= Horizon_SCAN) {
-          continue;
-        }
-
-        if (rangeMat.at<float>(rowIdn, columnIdn) != FLT_MAX) {
-          continue;
-        }
-
-        /* thisPoint = deskewPoint(&thisPoint, laserCloudIn->at(j, rowIdn).time); // Velodyne */
-        /* thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->at(j, rowIdn).t / 1000000000.0);  // Ouster */
-
-        rangeMat.at<float>(rowIdn, columnIdn) = range;
-
-        const int index          = columnIdn + rowIdn * Horizon_SCAN;
-        fullCloud->points[index] = thisPoint;
+      /* const float range = pointDistance(thisPoint); */
+      const float range = laserCloudIn->points.at(i).range / 1000.0f;
+      if (range < lidarMinRange || range > lidarMaxRange) {
+        continue;
       }
+
+      const int rowIdn = laserCloudIn->points.at(i).ring;
+      if (rowIdn < 0 || rowIdn >= N_SCAN) {
+        /* ROS_ERROR("Invalid ring: %d", rowIdn); */
+        continue;
+      }
+
+      if (rowIdn % downsampleRate != 0) {
+        /* ROS_ERROR("Downsampling. Throwing away row: %d", rowIdn); */
+        continue;
+      }
+      
+      PointType thisPoint;
+      thisPoint.x         = laserCloudIn->points.at(i).x;
+      thisPoint.y         = laserCloudIn->points.at(i).y;
+      thisPoint.z         = laserCloudIn->points.at(i).z;
+      thisPoint.intensity = laserCloudIn->points.at(i).intensity;
+
+      // TODO: polish this monstrosity
+      const float  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
+      static float ang_res_x    = 360.0 / float(Horizon_SCAN);
+      int          columnIdn    = -round((horizonAngle - 90.0) / ang_res_x) + Horizon_SCAN / 2;
+      if (columnIdn >= Horizon_SCAN) {
+        columnIdn -= Horizon_SCAN;
+      }
+
+      if (columnIdn < 0 || columnIdn >= Horizon_SCAN) {
+        continue;
+      }
+
+      if (rangeMat.at<float>(rowIdn, columnIdn) != FLT_MAX) {
+        continue;
+      }
+
+      /* thisPoint = deskewPoint(&thisPoint, laserCloudIn->at(j, rowIdn).time); // Velodyne */
+      /* thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->at(j, rowIdn).t / 1000000000.0);  // Ouster */
+
+      rangeMat.at<float>(rowIdn, columnIdn) = range;
+
+      const int index          = columnIdn + rowIdn * Horizon_SCAN;
+      fullCloud->points[index] = thisPoint;
     }
   }
   /*//}*/
