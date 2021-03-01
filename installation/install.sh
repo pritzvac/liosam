@@ -12,7 +12,7 @@ fi
 
 # install dependencies
 sudo apt update
-sudo apt-get install libtbb-dev ros-melodic-pcl-* libpcl-* ros-melodic-navigation ros-melodic-robot-localization ros-melodic-robot-state-publisher ros-melodic-imu-complementary-filter
+sudo apt-get -y install libtbb-dev ros-melodic-pcl-* libpcl-* ros-melodic-navigation ros-melodic-robot-localization ros-melodic-robot-state-publisher ros-melodic-imu-complementary-filter
 
 $SCRIPT_PATH/install_gtsam.sh $WORKSPACE_PATH
 # $SCRIPT_PATH/install_pcl.sh
