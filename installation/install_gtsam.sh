@@ -1,5 +1,10 @@
 #!/bin/bash
 
+set -e
+
+trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
+trap 'echo "$0: \"${last_command}\" command failed with exit code $?"' ERR
+
 if [[ $# -eq 1 ]]
 then
   GTSAM_PATH=$1
@@ -7,14 +12,13 @@ else
   GTSAM_PATH=/tmp
 fi
 
-
-if [ ! -d $GTSAM_PATH/gtsam-4.0.2 ]
+if [ ! -d $GTSAM_PATH/gtsam-4.0.3 ]
 then
-  wget -O $GTSAM_PATH/gtsam.zip https://github.com/borglab/gtsam/archive/4.0.2.zip
+  wget -O $GTSAM_PATH/gtsam.zip https://github.com/borglab/gtsam/archive/4.0.3.zip
   cd $GTSAM_PATH && unzip gtsam.zip -d $GTSAM_PATH
 fi
 
-cd $GTSAM_PATH/gtsam-4.0.2/
+cd $GTSAM_PATH/gtsam-4.0.3/
 
 [ ! -d "build" ] && mkdir build
 cd build
