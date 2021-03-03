@@ -5,6 +5,10 @@ set -e
 trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
 trap 'echo "$0: \"${last_command}\" command failed with exit code $?"' ERR
 
+distro=`lsb_release -r | awk '{ print $2 }'`
+[ "$distro" = "18.04" ] && ROS_DISTRO="melodic"
+[ "$distro" = "20.04" ] && ROS_DISTRO="noetic"
+
 if [[ $# -eq 1 ]]
 then
   GTSAM_PATH=$1
@@ -12,18 +16,22 @@ else
   GTSAM_PATH=/tmp
 fi
 
-if [ ! -d $GTSAM_PATH/gtsam-4.0.3 ]
+[ "$distro" = "18.04" ] && GTSAM_VERSION=4.0.2
+[ "$distro" = "20.04" ] && GTSAM_VERSION=4.0.3
+
+if [ ! -d $GTSAM_PATH/gtsam-$GTSAM_VERSION ]
 then
-  wget -O $GTSAM_PATH/gtsam.zip https://github.com/borglab/gtsam/archive/4.0.3.zip
+  wget -O $GTSAM_PATH/gtsam.zip https://github.com/borglab/gtsam/archive/$GTSAM_VERSION.zip
   cd $GTSAM_PATH && unzip gtsam.zip -d $GTSAM_PATH
 fi
 
-cd $GTSAM_PATH/gtsam-4.0.3/
+cd $GTSAM_PATH/gtsam-$GTSAM_VERSION/
 
 [ ! -d "build" ] && mkdir build
 cd build
 cmake -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF ..
-sudo make install -j4
+make -j4
+sudo make install
 
 # WORKSPACE_PATH=$GIT_PATH/workspace
 

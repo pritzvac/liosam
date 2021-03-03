@@ -28,7 +28,8 @@ sudo apt-get -y install \
   ros-$ROS_DISTRO-navigation \
   ros-$ROS_DISTRO-robot-localization \
   ros-$ROS_DISTRO-robot-state-publisher \
-  ros-$ROS_DISTRO-imu-complementary-filter
+  ros-$ROS_DISTRO-imu-complementary-filter\
+  libmetis-dev
 
 $SCRIPT_PATH/install_gtsam.sh $WORKSPACE_PATH
 # $SCRIPT_PATH/install_pcl.sh
