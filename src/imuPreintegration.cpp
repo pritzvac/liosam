@@ -35,8 +35,6 @@ public:
   Eigen::Affine3f imuOdomAffineFront;
   Eigen::Affine3f imuOdomAffineBack;
 
-  tf::TransformListener tfListener;
-  tf::StampedTransform  lidar2Baselink;
 
   double                    lidarOdomTime = -1;
   deque<nav_msgs::Odometry> imuOdomQueue;
@@ -44,32 +42,6 @@ public:
 public:
   /*//{ TransformFusion() */
   TransformFusion() {
-    if (lidarFrame != baselinkFrame) {
-
-      bool tf_found = false;
-      while (!tf_found) {
-        try {
-          tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
-          tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), lidar2Baselink);
-          // TODO: remove this after dataset testing
-          /* tf::Transform tf_tmp; */
-          /* tf_tmp.setIdentity(); */
-          /* tf_tmp.setOrigin(lidar2Baselink.getOrigin()); */
-          /* lidar2Baselink.setData(tf_tmp); */
-          tf_found = true;
-        }
-        catch (tf::TransformException ex) {
-          ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
-        }
-      }
-
-      ROS_INFO("Found transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
-
-    } else {
-
-      lidar2Baselink.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-      lidar2Baselink.setRotation(tf::createQuaternionFromRPY(0.0, 0.0, 0.0));
-    }
 
     subLaserOdometry =
         nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
@@ -141,7 +113,7 @@ public:
     tCur.setOrigin(tf::Vector3(x, y, z));
     tCur.setRotation(tf::createQuaternionFromRPY(roll, pitch, yaw));
     if (lidarFrame != baselinkFrame) {
-      tCur = tCur * lidar2Baselink;
+      tCur = tCur * tfLidar2Baselink;
     }
     tCur.setRotation(tCur.getRotation().normalized());
 
@@ -233,8 +205,10 @@ public:
 
   int key = 1;
 
-  gtsam::Pose3 imu2Lidar = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-extTrans(0, 0), -extTrans(1, 0), -extTrans(2, 0)));
-  gtsam::Pose3 lidar2Imu = gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(extTrans(0, 0), extTrans(1, 0), extTrans(2, 0)));
+  gtsam::Pose3 imu2Lidar =
+      gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-tfLidar2Imu.getOrigin().x(), -tfLidar2Imu.getOrigin().y(), -tfLidar2Imu.getOrigin().z()));
+  gtsam::Pose3 lidar2Imu =
+      gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(), tfLidar2Imu.getOrigin().z()));
 
 public:
   /*//{ IMUPreintegration() */
