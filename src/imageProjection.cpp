@@ -200,7 +200,8 @@ public:
     cloudHeader = currentCloudMsg.header;
     timeScanCur = cloudHeader.stamp.toSec();
     /* timeScanEnd = timeScanCur + laserCloudIn->points.back().time; // Velodyne */
-    timeScanEnd = timeScanCur + (float)laserCloudIn->points.back().t / 1.0e9;  // Ouster
+    /* timeScanEnd = timeScanCur + (float)laserCloudIn->points.back().t / 1.0e9;  // Ouster */
+    timeScanEnd = timeScanCur;  // sim
 
     // check dense flag
     if (!laserCloudIn->is_dense) {
@@ -502,14 +503,11 @@ public:
 
   /*//{ projectPointCloud() */
   void projectPointCloud() {
-    const int cloudSize = laserCloudIn->points.size();
     // range image projection
-    for (int i = 0; i < cloudSize; ++i) {
-      PointType thisPoint;
-      thisPoint.x         = laserCloudIn->points[i].x;
-      thisPoint.y         = laserCloudIn->points[i].y;
-      thisPoint.z         = laserCloudIn->points[i].z;
-      thisPoint.intensity = laserCloudIn->points[i].intensity;
+    const unsigned int cloudSize = laserCloudIn->points.size();
+    for (unsigned int i = 0; i < cloudSize; i++) {
+      /* ROS_WARN("(%d, %d) - xyz: (%0.2f, %0.2f, %0.2f), ring: %d", j, rowIdn, laserCloudIn->at(j, rowIdn).x, laserCloudIn->at(j, rowIdn).y, */
+      /*          laserCloudIn->at(j, rowIdn).z, laserCloudIn->at(j, rowIdn).ring); */
 
       /* const float range = pointDistance(thisPoint); */
       const float range = laserCloudIn->points.at(i).range / 1000.0f;
@@ -517,7 +515,7 @@ public:
         continue;
       }
 
-      const int rowIdn = laserCloudIn->points[i].ring;
+      const int rowIdn = laserCloudIn->points.at(i).ring;
       if (rowIdn < 0 || rowIdn >= N_SCAN) {
         /* ROS_ERROR("Invalid ring: %d", rowIdn); */
         continue;
@@ -527,6 +525,12 @@ public:
         /* ROS_ERROR("Downsampling. Throwing away row: %d", rowIdn); */
         continue;
       }
+      
+      PointType thisPoint;
+      thisPoint.x         = laserCloudIn->points.at(i).x;
+      thisPoint.y         = laserCloudIn->points.at(i).y;
+      thisPoint.z         = laserCloudIn->points.at(i).z;
+      thisPoint.intensity = laserCloudIn->points.at(i).intensity;
 
       // TODO: polish this monstrosity
       const float  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
@@ -544,8 +548,8 @@ public:
         continue;
       }
 
-      /* thisPoint = deskewPoint(&thisPoint, laserCloudIn->points[i].time); // Velodyne */
-      thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->points[i].t / 1000000000.0);  // Ouster
+      /* thisPoint = deskewPoint(&thisPoint, laserCloudIn->at(j, rowIdn).time); // Velodyne */
+      /* thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->at(j, rowIdn).t / 1000000000.0);  // Ouster */
 
       rangeMat.at<float>(rowIdn, columnIdn) = range;
 
@@ -565,6 +569,7 @@ public:
       for (int j = 0; j < Horizon_SCAN; ++j) {
         /* ROS_WARN("i: %d, j: %d, rangeMat: %0.10f, isFltMax: %d", i, j, rangeMat.at<float>(i,j), rangeMat.at<float>(i,j) == FLT_MAX); */
         if (rangeMat.at<float>(i, j) != FLT_MAX) {
+          /* ROS_WARN("i: %d, j: %d, rangeMat: %0.10f, isFltMax: %d", i, j, rangeMat.at<float>(i,j), rangeMat.at<float>(i,j) == FLT_MAX); */
           // mark the points' column index for marking occlusion later
           cloudInfo->pointColInd[count] = j;
           // save range info

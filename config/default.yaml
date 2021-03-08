@@ -37,6 +37,7 @@ lio_sam:
  
   # Mavros IMU real
   mavros_imu:
+    frame: "base_link"
     imuTopic: "mavros/imu/data"
     imuRPYWeight: 0.01
     imuAccNoise: 0.006
@@ -44,13 +45,14 @@ lio_sam:
     imuAccBiasN: 0.006
     imuGyrBiasN: 0.000038785
     # lidar -> imu tf
-    extrinsicTrans: [0.0, 0.0, -0.1]
-    extrinsicRot: [1, 0, 0,
-                   0, 1, 0,
-                   0, 0, 1]
+    # extrinsicTrans: [0.0, 0.0, -0.1]
+    # extrinsicRot: [1, 0, 0,
+    #                0, 1, 0,
+    #                0, 0, 1]
 
   # Ouster IMU
   os1_imu:
+    frame: "base_link"
     imuTopic: "os1_cloud_node/imu_data"
     imuRPYWeight: 0.01
     imuAccNoise: 1.8279743741630960e+00
@@ -58,13 +60,14 @@ lio_sam:
     imuAccBiasN: 8.9256192570144235e-02
     imuGyrBiasN: 4.8477797168896648e-03
     # lidar -> imu tf
-    extrinsicTrans: [-0.006253, 0.011775, -0.028535]
-    extrinsicRot: [-1, 0, 0,
-                   0, -1, 0,
-                   0, 0, 1]
+    # extrinsicTrans: [-0.006253, 0.011775, -0.028535]
+    # extrinsicRot: [-1, 0, 0,
+    #                0, -1, 0,
+    #                0, 0, 1]
 
   # VIO IMU
   vio_imu:
+    frame: "base_link"
     imuTopic: "vio_imu/data"
     imuRPYWeight: 0.01
     imuAccNoise: 1.7391734436505606e+00
@@ -72,13 +75,14 @@ lio_sam:
     imuAccBiasN: 2.2595603813254508e-02
     imuGyrBiasN: 1.0910192034708675e-03
     # lidar -> imu tf TBD translation
-    extrinsicTrans: [0.0, 0.0, 0.0735]
-    extrinsicRot: [-1, 0, 0,
-                   0, -1, 0,
-                   0, 0, 1]
+    # extrinsicTrans: [0.0, 0.0, 0.0735]
+    # extrinsicRot: [-1, 0, 0,
+    #                0, -1, 0,
+    #                0, 0, 1]
 
   # XSENS MTi-30 IMU
   xsens_imu:
+    frame: "base_link"
     imuTopic: "/imu/data"
     imuRPYWeight: 0.01
     imuAccNoise: 8.8146213961764186e-01
@@ -86,10 +90,10 @@ lio_sam:
     imuAccBiasN: 3.8034243866029660e-02
     imuGyrBiasN: 4.3899304540653836e-03
     # lidar -> imu tf TBD translation
-    extrinsicTrans: [0.0, 0.0, 0.08]
-    extrinsicRot: [-1, 0, 0,
-                   0, -1, 0,
-                   0, 0, 1]
+    # extrinsicTrans: [0.0, 0.0, 0.08]
+    # extrinsicRot: [-1, 0, 0,
+    #                0, -1, 0,
+    #                0, 0, 1]
 
 
   # LOAM feature threshold

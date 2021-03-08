@@ -73,9 +73,15 @@ public:
 
   // Frames
   std::string lidarFrame;
+  std::string imuFrame;
   std::string baselinkFrame;
   std::string odometryFrame;
   std::string mapFrame;
+
+  // TF
+  tf::TransformListener tfListener;
+  tf::StampedTransform  tfLidar2Baselink;
+  tf::StampedTransform  tfLidar2Imu;
 
   // GPS Settings
   bool  useImuHeadingInitialization;
@@ -103,8 +109,7 @@ public:
   float              imuGyrBiasN;
   float              imuGravity;
   float              imuRPYWeight;
-  Eigen::MatrixXd    extRot;
-  Eigen::MatrixXd    extTrans;
+  Eigen::Matrix3d    extRot;
   Eigen::Quaterniond extQRPY;
 
   // LOAM
@@ -170,10 +175,12 @@ public:
     addNamespace("/" + uav_name, gpsTopic);
 
     pl.loadParam("lio_sam/lidarFrame", lidarFrame, std::string("base_link"));
+    pl.loadParam("lio_sam/" + imuType + "/frame", imuFrame);
     pl.loadParam("lio_sam/baselinkFrame", baselinkFrame, std::string("base_link"));
     pl.loadParam("lio_sam/odometryFrame", odometryFrame, std::string("odom"));
     pl.loadParam("lio_sam/mapFrame", mapFrame, std::string("map"));
     addNamespace(uav_name, lidarFrame);
+    addNamespace(uav_name, imuFrame);
     addNamespace(uav_name, baselinkFrame);
     addNamespace(uav_name, odometryFrame);
     addNamespace(uav_name, mapFrame);
@@ -199,9 +206,7 @@ public:
     pl.loadParam("lio_sam/" + imuType + "/imuGyrBiasN", imuGyrBiasN, 0.00003f);
     pl.loadParam("lio_sam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
     pl.loadParam("lio_sam/imuGravity", imuGravity, 9.80511f);
-    pl.loadMatrixStatic("lio_sam/" + imuType + "/extrinsicRot", extRot, 3, 3);
-    pl.loadMatrixStatic("lio_sam/" + imuType + "/extrinsicTrans", extTrans, 3, 1);
-    extQRPY = Eigen::Quaterniond(Eigen::Matrix3d(extRot));
+    /* pl.loadMatrixStatic("lio_sam/" + imuType + "/extrinsicRot", extRot, 3, 3); */
 
     pl.loadParam("lio_sam/edgeThreshold", edgeThreshold, 0.1f);
     pl.loadParam("lio_sam/surfThreshold", surfThreshold, 0.1f);
@@ -239,6 +244,71 @@ public:
       ROS_ERROR("[LIO_SAM]: Could not load all parameters!");
       ros::shutdown();
     }
+
+    /*//{ find lidar -> base_link transform */
+    if (lidarFrame != baselinkFrame) {
+
+      bool tf_found = false;
+      while (!tf_found) {
+        try {
+          tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
+          tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), tfLidar2Baselink);
+          tf_found = true;
+        }
+        catch (tf::TransformException ex) {
+          ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+        }
+      }
+
+      ROS_INFO("Found transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+
+    } else {
+
+      tfLidar2Baselink.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+      tfLidar2Baselink.setRotation(tf::createQuaternionFromRPY(0.0, 0.0, 0.0));
+    }
+    /*//}*/
+
+    /*//{ find lidar -> imu transform */
+    if (imuFrame == baselinkFrame) {
+
+      tfLidar2Imu = tfLidar2Baselink;
+      ROS_INFO("Found transform from: %s, to: %s.", lidarFrame.c_str(), imuFrame.c_str());
+
+    } else if (imuFrame != lidarFrame) {
+
+      bool tf_found = false;
+      while (!tf_found) {
+        try {
+          tfListener.waitForTransform(lidarFrame, imuFrame, ros::Time(0), ros::Duration(3.0));
+          tfListener.lookupTransform(lidarFrame, imuFrame, ros::Time(0), tfLidar2Imu);
+          tf_found = true;
+        }
+        catch (tf::TransformException ex) {
+          ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), imuFrame.c_str());
+        }
+      }
+
+      ROS_INFO("Found transform from: %s, to: %s.", lidarFrame.c_str(), imuFrame.c_str());
+
+    } else {
+
+      tfLidar2Imu.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
+      tfLidar2Imu.setRotation(tf::createQuaternionFromRPY(0.0, 0.0, 0.0));
+    }
+    /*//}*/
+
+    extQRPY = Eigen::Quaterniond(tfLidar2Imu.getRotation().w(), tfLidar2Imu.getRotation().x(), tfLidar2Imu.getRotation().y(), tfLidar2Imu.getRotation().z());
+    extRot  = Eigen::Matrix3d(extQRPY);
+
+    ROS_INFO("Transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+    ROS_INFO("   xyz: (%0.1f, %0.1f, %0.1f); xyzq: (%0.1f, %0.1f, %0.1f, %0.1f)", tfLidar2Baselink.getOrigin().x(), tfLidar2Baselink.getOrigin().y(),
+             tfLidar2Baselink.getOrigin().z(), tfLidar2Baselink.getRotation().x(), tfLidar2Baselink.getRotation().y(), tfLidar2Baselink.getRotation().z(),
+             tfLidar2Baselink.getRotation().w());
+    ROS_INFO("Transform from: %s, to: %s.", lidarFrame.c_str(), imuFrame.c_str());
+    ROS_INFO("   xyz: (%0.1f, %0.1f, %0.1f); xyzq: (%0.1f, %0.1f, %0.1f, %0.1f)", tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(),
+             tfLidar2Imu.getOrigin().z(), tfLidar2Imu.getRotation().x(), tfLidar2Imu.getRotation().y(), tfLidar2Imu.getRotation().z(),
+             tfLidar2Imu.getRotation().w());
 
     ros::Duration(0.1).sleep();
   }

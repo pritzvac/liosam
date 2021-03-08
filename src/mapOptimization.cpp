@@ -1612,7 +1612,7 @@ public:
     tf::Transform T_lidar;
 
     // TODO: Load this as static TF
-    T.setOrigin(tf::Vector3(extTrans(0, 0), extTrans(1, 0), extTrans(2, 0)));
+    T.setOrigin(tf::Vector3(tfLidar2Baselink.getOrigin().x(), tfLidar2Baselink.getOrigin().y(), tfLidar2Baselink.getOrigin().z()));
     /* T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI)); // os_lidar -> os_sensor */
     T.setRotation(tf::createQuaternionFromRPY(0, 0, 0));  // os_sensor -> fcu
 
