@@ -5,6 +5,11 @@
 # Make sure that the building flags are correctly set to the workspaces' flags of your packages (default flags correlate with mrs_workspace)
 # Do not forget to require the specific PCL_VERSION in your CMakeLists.txt
 
+set -e
+
+trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
+trap 'echo "$0: \"${last_command}\" command failed with exit code $?"' ERR
+
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
 # Releases can be found at: https://github.com/PointCloudLibrary/pcl/releases
