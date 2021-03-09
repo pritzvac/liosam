@@ -11,7 +11,7 @@ distro=`lsb_release -r | awk '{ print $2 }'`
 
 # get the path to this script
 SCRIPT_PATH=`dirname "$0"`
-SCRIPT_PATH=`( cd "$MY_PATH" && pwd )`
+SCRIPT_PATH=`( cd "$SCRIPT_PATH" && pwd )`
 
 if [[ $# -eq 1 ]]
 then
