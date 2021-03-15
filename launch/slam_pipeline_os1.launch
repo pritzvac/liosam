@@ -114,6 +114,8 @@
     <arg unless="$(eval arg('RUN_TYPE') == 'simulation')" name="lidar3d_filter_intensity_en" value="$(arg lidar3d/filter/intensity)" />
     <arg name="lidar3d_filter_intensity_thrd" value="$(arg lidar3d/filter/intensity/value)" />
     <arg name="lidar3d_filter_intensity_range" value="$(arg lidar3d/filter/intensity/range)" />
+    <!-- <arg name="lidar3d/downsampling/row_step" default="1" /> -->
+    <arg name="lidar3d/downsampling/col_step" default="2" />
 
     <!-- Depth camera -->
     <arg name="depth_republish" value="$(arg depth/republish)" />

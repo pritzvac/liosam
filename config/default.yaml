@@ -4,7 +4,7 @@ lio_sam:
 
   # Topics
   pointCloudTopic: "os_cloud_nodelet/points_processed"  # Point cloud data
-  odomTopic: "lio_sam/odometry/imu"                     # IMU pre-preintegration odometry, same frequency as IMU
+  odomTopic: "liosam/odometry/imu"                     # IMU pre-preintegration odometry, same frequency as IMU
   gpsTopic: "none"                                      # GPS odometry topic from navsat, see module_navsat.launch file
 
   # GPS Settings
@@ -16,8 +16,8 @@ lio_sam:
   # Frames
   lidarFrame: "os_sensor"
   baselinkFrame: "fcu"
-  odometryFrame: "lio_sam_origin"
-  mapFrame: "lio_sam_mapping_origin"
+  odometryFrame: "liosam_origin"
+  mapFrame: "liosam_mapping_origin"
   
   # Export settings
   savePCD: false                              # https://github.com/TixiaoShan/LIO-SAM/issues/3
@@ -37,7 +37,7 @@ lio_sam:
  
   # Mavros IMU real
   mavros_imu:
-    frame: "base_link"
+    frame: "fcu"
     imuTopic: "mavros/imu/data"
     imuRPYWeight: 0.01
     imuAccNoise: 0.006
@@ -52,7 +52,7 @@ lio_sam:
 
   # Ouster IMU
   os1_imu:
-    frame: "base_link"
+    frame: "os_imu"
     imuTopic: "os1_cloud_node/imu_data"
     imuRPYWeight: 0.01
     imuAccNoise: 1.8279743741630960e+00
