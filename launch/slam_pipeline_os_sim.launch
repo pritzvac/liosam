@@ -141,7 +141,7 @@
   <!--//}-->
 
   <!--//{ LIO SLAM NODE -->
-  <include file="$(find lio_sam)/launch/uav_nodelet.launch">
+  <include file="$(find liosam)/launch/uav_nodelet.launch">
     <arg name="UAV_NAME" value="$(arg UAV_NAME)"/>
 
     <arg name="nodelet" value="$(arg nodelet)" />
@@ -149,7 +149,7 @@
     <arg name="launch_delay" default="0"/>
     <arg name="launch_prefix" default="$(arg launch_prefix)"/>
 
-    <arg name="config_file" value="$(find lio_sam)/config/sim.yaml" />
+    <arg name="config_file" value="$(find liosam)/config/sim.yaml" />
     <arg name="imu_type" value="mavros_imu" />
     
     <arg name="rviz" value="true"/>

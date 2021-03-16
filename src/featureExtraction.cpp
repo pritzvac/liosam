@@ -1,7 +1,7 @@
 #include "utility.h"
-#include "lio_sam/cloud_info.h"
+#include "liosam/cloud_info.h"
 
-namespace lio_sam
+namespace liosam
 {
 namespace feature_extraction
 {
@@ -43,12 +43,12 @@ public:
 public:
   /*//{ FeatureExtractionImpl() */
   FeatureExtractionImpl() {
-    subLaserCloudInfo = nh.subscribe<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1, &FeatureExtractionImpl::laserCloudInfoHandler, this,
-                                                          ros::TransportHints().tcpNoDelay());
+    subLaserCloudInfo = nh.subscribe<liosam::cloud_info>("liosam/deskew/cloud_info", 1, &FeatureExtractionImpl::laserCloudInfoHandler, this,
+                                                         ros::TransportHints().tcpNoDelay());
 
-    pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info>("lio_sam/feature/cloud_info", 1);
-    pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_corner", 1);
-    pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/feature/cloud_surface", 1);
+    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/feature/cloud_info", 1);
+    pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner", 1);
+    pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface", 1);
 
     initializationValue();
   }
@@ -71,7 +71,7 @@ public:
   /*//}*/
 
   /*//{ laserCloudInfoHandler() */
-  void laserCloudInfoHandler(const lio_sam::cloud_info::ConstPtr &msgIn) {
+  void laserCloudInfoHandler(const liosam::cloud_info::ConstPtr &msgIn) {
     pcl::fromROSMsg(msgIn->cloud_deskewed, *extractedCloud);  // new cloud for extraction
 
     calculateSmoothness(msgIn);
@@ -85,7 +85,7 @@ public:
   /*//}*/
 
   /*//{ calculateSmoothness() */
-  void calculateSmoothness(const lio_sam::cloud_info::ConstPtr &cloud_info) {
+  void calculateSmoothness(const liosam::cloud_info::ConstPtr &cloud_info) {
     const int cloudSize = extractedCloud->points.size();
     for (int i = 5; i < cloudSize - 5; i++) {
       const float diffRange = cloud_info->pointRange[i - 5] + cloud_info->pointRange[i - 4] + cloud_info->pointRange[i - 3] + cloud_info->pointRange[i - 2] +
@@ -104,7 +104,7 @@ public:
   /*//}*/
 
   /*//{ markOccludedPoints() */
-  void markOccludedPoints(const lio_sam::cloud_info::ConstPtr &cloud_info) {
+  void markOccludedPoints(const liosam::cloud_info::ConstPtr &cloud_info) {
     const int cloudSize = extractedCloud->points.size();
     // mark occluded points and parallel beam points
     for (int i = 5; i < cloudSize - 6; ++i) {
@@ -143,7 +143,7 @@ public:
   /*//}*/
 
   /*//{ extractFeatures() */
-  void extractFeatures(const lio_sam::cloud_info::ConstPtr &cloud_info) {
+  void extractFeatures(const liosam::cloud_info::ConstPtr &cloud_info) {
     cornerCloud->clear();
     surfaceCloud->clear();
 
@@ -239,23 +239,23 @@ public:
   /*//}*/
 
   /*//{ publishFeatureCloud() */
-  void publishFeatureCloud(const lio_sam::cloud_info::ConstPtr &msg) {
+  void publishFeatureCloud(const liosam::cloud_info::ConstPtr &msg) {
 
     // Copy everything except: laser data indices and ranges (no further need for this information)
-    lio_sam::cloud_info::Ptr cloudInfo = boost::make_shared<lio_sam::cloud_info>();
-    cloudInfo->header                  = msg->header;
-    cloudInfo->imuAvailable            = msg->imuAvailable;
-    cloudInfo->odomAvailable           = msg->odomAvailable;
-    cloudInfo->imuRollInit             = msg->imuRollInit;
-    cloudInfo->imuPitchInit            = msg->imuPitchInit;
-    cloudInfo->imuYawInit              = msg->imuYawInit;
-    cloudInfo->initialGuessX           = msg->initialGuessX;
-    cloudInfo->initialGuessY           = msg->initialGuessY;
-    cloudInfo->initialGuessZ           = msg->initialGuessZ;
-    cloudInfo->initialGuessRoll        = msg->initialGuessRoll;
-    cloudInfo->initialGuessPitch       = msg->initialGuessPitch;
-    cloudInfo->initialGuessYaw         = msg->initialGuessYaw;
-    cloudInfo->cloud_deskewed          = msg->cloud_deskewed;
+    liosam::cloud_info::Ptr cloudInfo = boost::make_shared<liosam::cloud_info>();
+    cloudInfo->header                 = msg->header;
+    cloudInfo->imuAvailable           = msg->imuAvailable;
+    cloudInfo->odomAvailable          = msg->odomAvailable;
+    cloudInfo->imuRollInit            = msg->imuRollInit;
+    cloudInfo->imuPitchInit           = msg->imuPitchInit;
+    cloudInfo->imuYawInit             = msg->imuYawInit;
+    cloudInfo->initialGuessX          = msg->initialGuessX;
+    cloudInfo->initialGuessY          = msg->initialGuessY;
+    cloudInfo->initialGuessZ          = msg->initialGuessZ;
+    cloudInfo->initialGuessRoll       = msg->initialGuessRoll;
+    cloudInfo->initialGuessPitch      = msg->initialGuessPitch;
+    cloudInfo->initialGuessYaw        = msg->initialGuessYaw;
+    cloudInfo->cloud_deskewed         = msg->cloud_deskewed;
 
     // save newly extracted features
     cloudInfo->cloud_corner  = publishCloud(&pubCornerPoints, cornerCloud, msg->header.stamp, lidarFrame);
@@ -291,7 +291,7 @@ private:
 //}
 
 }  // namespace feature_extraction
-}  // namespace lio_sam
+}  // namespace liosam
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(lio_sam::feature_extraction::FeatureExtraction, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(liosam::feature_extraction::FeatureExtraction, nodelet::Nodelet)

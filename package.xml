@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
 
-  <name>lio_sam</name>
+  <name>liosam</name>
   <version>1.0.0</version>
   <description>Laser-inertial odometry by Tixiao Shan</description>
 

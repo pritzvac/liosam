@@ -20,7 +20,7 @@ using gtsam::symbol_shorthand::B;  // Bias  (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Vel   (xdot,ydot,zdot)
 using gtsam::symbol_shorthand::X;  // Pose3 (x,y,z,r,p,y)
 
-namespace lio_sam
+namespace liosam
 {
 namespace imu_preintegration
 {
@@ -49,13 +49,13 @@ public:
   TransformFusion() {
 
     subLaserOdometry =
-        nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        nh.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
     subImuOdometry =
         nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
 
     pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
     /* ROS_WARN("pubImuOdometry topic: %s", pubImuOdometry.getTopic().c_str()); */
-    pubImuPath = nh.advertise<nav_msgs::Path>("lio_sam/imu/path", 1);
+    pubImuPath = nh.advertise<nav_msgs::Path>("liosam/imu/path", 1);
   }
   /*//}*/
 
@@ -219,7 +219,7 @@ public:
   /*//{ ImuPreintegrationImpl() */
   ImuPreintegrationImpl() {
     subImu      = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImuPreintegrationImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
-    subOdometry = nh.subscribe<nav_msgs::Odometry>("lio_sam/mapping/odometry_incremental", 5, &ImuPreintegrationImpl::odometryHandler, this,
+    subOdometry = nh.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 5, &ImuPreintegrationImpl::odometryHandler, this,
                                                    ros::TransportHints().tcpNoDelay());
 
     pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 2000);
@@ -551,7 +551,7 @@ private:
 //}
 
 }  // namespace imu_preintegration
-}  // namespace lio_sam
+}  // namespace liosam
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(lio_sam::imu_preintegration::ImuPreintegration, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(liosam::imu_preintegration::ImuPreintegration, nodelet::Nodelet)

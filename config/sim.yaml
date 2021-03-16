@@ -1,4 +1,4 @@
-lio_sam:
+liosam:
 
   imuType: "mavros_imu" # {os1_imu, mavros_imu, vio_imu, xsens_imu}
 

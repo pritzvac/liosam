@@ -157,91 +157,91 @@ public:
     pl.loadParam("uav_name", uav_name);
     /* ROS_ERROR("[%s]: loaded uav_name: %s", ros::this_node::getName().c_str(), uav_name.c_str()); */
 
-    pl.loadParam("lio_sam/imuType", imuType);
+    pl.loadParam("liosam/imuType", imuType);
     ROS_ERROR("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
 
-    pl.loadParam("lio_sam/pointCloudTopic", pointCloudTopic);
+    pl.loadParam("liosam/pointCloudTopic", pointCloudTopic);
     addNamespace("/" + uav_name, pointCloudTopic);
 
-    /* ROS_ERROR("[%s]: loading imu_topic: %s", ros::this_node::getName().c_str(), std::string("lio_sam/" + imuType + "/imuTopic").c_str()); */
-    pl.loadParam("lio_sam/" + imuType + "/imuTopic", imuTopic);
+    /* ROS_ERROR("[%s]: loading imu_topic: %s", ros::this_node::getName().c_str(), std::string("liosam/" + imuType + "/imuTopic").c_str()); */
+    pl.loadParam("liosam/" + imuType + "/imuTopic", imuTopic);
     addNamespace("/" + uav_name, imuTopic);
     ROS_ERROR("[%s]: loaded imu_topic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
 
-    pl.loadParam("lio_sam/odomTopic", odomTopic);
+    pl.loadParam("liosam/odomTopic", odomTopic);
     addNamespace("/" + uav_name, odomTopic);
 
-    pl.loadParam("lio_sam/gpsTopic", gpsTopic, std::string("odometry/gps"));
+    pl.loadParam("liosam/gpsTopic", gpsTopic, std::string("odometry/gps"));
     addNamespace("/" + uav_name, gpsTopic);
 
-    pl.loadParam("lio_sam/lidarFrame", lidarFrame, std::string("base_link"));
-    pl.loadParam("lio_sam/" + imuType + "/frame", imuFrame);
-    pl.loadParam("lio_sam/baselinkFrame", baselinkFrame, std::string("base_link"));
-    pl.loadParam("lio_sam/odometryFrame", odometryFrame, std::string("odom"));
-    pl.loadParam("lio_sam/mapFrame", mapFrame, std::string("map"));
+    pl.loadParam("liosam/lidarFrame", lidarFrame, std::string("base_link"));
+    pl.loadParam("liosam/" + imuType + "/frame", imuFrame);
+    pl.loadParam("liosam/baselinkFrame", baselinkFrame, std::string("base_link"));
+    pl.loadParam("liosam/odometryFrame", odometryFrame, std::string("odom"));
+    pl.loadParam("liosam/mapFrame", mapFrame, std::string("map"));
     addNamespace(uav_name, lidarFrame);
     addNamespace(uav_name, imuFrame);
     addNamespace(uav_name, baselinkFrame);
     addNamespace(uav_name, odometryFrame);
     addNamespace(uav_name, mapFrame);
 
-    pl.loadParam("lio_sam/useImuHeadingInitialization", useImuHeadingInitialization, false);
-    pl.loadParam("lio_sam/useGpsElevation", useGpsElevation, false);
-    pl.loadParam("lio_sam/gpsCovThreshold", gpsCovThreshold, 2.0f);
-    pl.loadParam("lio_sam/poseCovThreshold", poseCovThreshold, 25.0f);
+    pl.loadParam("liosam/useImuHeadingInitialization", useImuHeadingInitialization, false);
+    pl.loadParam("liosam/useGpsElevation", useGpsElevation, false);
+    pl.loadParam("liosam/gpsCovThreshold", gpsCovThreshold, 2.0f);
+    pl.loadParam("liosam/poseCovThreshold", poseCovThreshold, 25.0f);
 
-    pl.loadParam("lio_sam/savePCD", savePCD, false);
-    pl.loadParam("lio_sam/savePCDDirectory", savePCDDirectory, std::string("/Downloads/LOAM/"));
+    pl.loadParam("liosam/savePCD", savePCD, false);
+    pl.loadParam("liosam/savePCDDirectory", savePCDDirectory, std::string("/Downloads/LOAM/"));
 
-    pl.loadParam("lio_sam/N_SCAN", N_SCAN);
-    pl.loadParam("lio_sam/Horizon_SCAN", Horizon_SCAN);
-    pl.loadParam("lio_sam/timeField", timeField, std::string("t"));
-    pl.loadParam("lio_sam/downsampleRate", downsampleRate, 1);
-    pl.loadParam("lio_sam/lidarMinRange", lidarMinRange, 0.1f);
-    pl.loadParam("lio_sam/lidarMaxRange", lidarMaxRange, 1000.0f);
+    pl.loadParam("liosam/N_SCAN", N_SCAN);
+    pl.loadParam("liosam/Horizon_SCAN", Horizon_SCAN);
+    pl.loadParam("liosam/timeField", timeField, std::string("t"));
+    pl.loadParam("liosam/downsampleRate", downsampleRate, 1);
+    pl.loadParam("liosam/lidarMinRange", lidarMinRange, 0.1f);
+    pl.loadParam("liosam/lidarMaxRange", lidarMaxRange, 1000.0f);
 
-    pl.loadParam("lio_sam/" + imuType + "/imuAccNoise", imuAccNoise, 0.01f);
-    pl.loadParam("lio_sam/" + imuType + "/imuGyrNoise", imuGyrNoise, 0.001f);
-    pl.loadParam("lio_sam/" + imuType + "/imuAccBiasN", imuAccBiasN, 0.0002f);
-    pl.loadParam("lio_sam/" + imuType + "/imuGyrBiasN", imuGyrBiasN, 0.00003f);
-    pl.loadParam("lio_sam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
-    pl.loadParam("lio_sam/imuGravity", imuGravity, 9.80511f);
-    /* pl.loadMatrixStatic("lio_sam/" + imuType + "/extrinsicRot", extRot, 3, 3); */
+    pl.loadParam("liosam/" + imuType + "/imuAccNoise", imuAccNoise, 0.01f);
+    pl.loadParam("liosam/" + imuType + "/imuGyrNoise", imuGyrNoise, 0.001f);
+    pl.loadParam("liosam/" + imuType + "/imuAccBiasN", imuAccBiasN, 0.0002f);
+    pl.loadParam("liosam/" + imuType + "/imuGyrBiasN", imuGyrBiasN, 0.00003f);
+    pl.loadParam("liosam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
+    pl.loadParam("liosam/imuGravity", imuGravity, 9.80511f);
+    /* pl.loadMatrixStatic("liosam/" + imuType + "/extrinsicRot", extRot, 3, 3); */
 
-    pl.loadParam("lio_sam/edgeThreshold", edgeThreshold, 0.1f);
-    pl.loadParam("lio_sam/surfThreshold", surfThreshold, 0.1f);
-    pl.loadParam("lio_sam/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
-    pl.loadParam("lio_sam/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
+    pl.loadParam("liosam/edgeThreshold", edgeThreshold, 0.1f);
+    pl.loadParam("liosam/surfThreshold", surfThreshold, 0.1f);
+    pl.loadParam("liosam/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
+    pl.loadParam("liosam/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
 
-    pl.loadParam("lio_sam/odometrySurfLeafSize", odometrySurfLeafSize, 0.2f);
-    pl.loadParam("lio_sam/mappingCornerLeafSize", mappingCornerLeafSize, 0.2f);
-    pl.loadParam("lio_sam/mappingSurfLeafSize", mappingSurfLeafSize, 0.2f);
+    pl.loadParam("liosam/odometrySurfLeafSize", odometrySurfLeafSize, 0.2f);
+    pl.loadParam("liosam/mappingCornerLeafSize", mappingCornerLeafSize, 0.2f);
+    pl.loadParam("liosam/mappingSurfLeafSize", mappingSurfLeafSize, 0.2f);
 
-    pl.loadParam("lio_sam/z_tollerance", z_tollerance, FLT_MAX);
-    pl.loadParam("lio_sam/rotation_tollerance", rotation_tollerance, FLT_MAX);
+    pl.loadParam("liosam/z_tollerance", z_tollerance, FLT_MAX);
+    pl.loadParam("liosam/rotation_tollerance", rotation_tollerance, FLT_MAX);
 
-    pl.loadParam("lio_sam/numberOfCores", numberOfCores, 4);
-    pl.loadParam("lio_sam/mappingProcessInterval", mappingProcessInterval, 0.15);
+    pl.loadParam("liosam/numberOfCores", numberOfCores, 4);
+    pl.loadParam("liosam/mappingProcessInterval", mappingProcessInterval, 0.15);
 
-    pl.loadParam("lio_sam/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0f);
-    pl.loadParam("lio_sam/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2f);
-    pl.loadParam("lio_sam/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0f);
-    pl.loadParam("lio_sam/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0f);
+    pl.loadParam("liosam/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0f);
+    pl.loadParam("liosam/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2f);
+    pl.loadParam("liosam/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0f);
+    pl.loadParam("liosam/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0f);
 
-    pl.loadParam("lio_sam/loopClosureEnableFlag", loopClosureEnableFlag, false);
-    pl.loadParam("lio_sam/loopClosureFrequency", loopClosureFrequency, 1.0f);
-    pl.loadParam("lio_sam/surroundingKeyframeSize", surroundingKeyframeSize, 50);
-    pl.loadParam("lio_sam/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0f);
-    pl.loadParam("lio_sam/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0f);
-    pl.loadParam("lio_sam/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
-    pl.loadParam("lio_sam/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3f);
+    pl.loadParam("liosam/loopClosureEnableFlag", loopClosureEnableFlag, false);
+    pl.loadParam("liosam/loopClosureFrequency", loopClosureFrequency, 1.0f);
+    pl.loadParam("liosam/surroundingKeyframeSize", surroundingKeyframeSize, 50);
+    pl.loadParam("liosam/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0f);
+    pl.loadParam("liosam/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0f);
+    pl.loadParam("liosam/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
+    pl.loadParam("liosam/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3f);
 
-    pl.loadParam("lio_sam/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3f);
-    pl.loadParam("lio_sam/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0f);
-    pl.loadParam("lio_sam/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0f);
+    pl.loadParam("liosam/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3f);
+    pl.loadParam("liosam/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0f);
+    pl.loadParam("liosam/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0f);
 
     if (!pl.loadedSuccessfully()) {
-      ROS_ERROR("[LIO_SAM]: Could not load all parameters!");
+      ROS_ERROR("[LIOSAM]: Could not load all parameters!");
       ros::shutdown();
     }
 

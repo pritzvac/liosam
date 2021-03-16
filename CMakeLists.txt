@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(lio_sam)
+project(liosam)
 
 set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -pthread")

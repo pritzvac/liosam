@@ -6,12 +6,12 @@
   <group ns="$(arg uav_name)">
 
     <!--- LOAM -->
-    <include file="$(find lio_sam)/launch/include/module_loam.launch" >
-      <arg name="config_file" value="$(find lio_sam)/config/sim.yaml" />
+    <include file="$(find liosam)/launch/include/module_loam.launch" >
+      <arg name="config_file" value="$(find liosam)/config/sim.yaml" />
     </include>
 
     <!--- Run Rviz-->
-    <include if="$(arg rviz)" file="$(find lio_sam)/launch/include/module_rviz.launch" />
+    <include if="$(arg rviz)" file="$(find liosam)/launch/include/module_rviz.launch" />
 
   </group>
 

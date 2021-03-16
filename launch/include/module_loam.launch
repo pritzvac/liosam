@@ -12,28 +12,28 @@
   <arg name="launch_prefix" default=""/>
 
   <!-- Parameters -->
-  <rosparam file="$(find lio_sam)/config/default.yaml" command="load" />
+  <rosparam file="$(find liosam)/config/default.yaml" command="load" />
   <!-- Load a user param file -->
   <rosparam if="$(eval not arg('config_file') == '')" file="$(arg config_file)" />
   <rosparam param="uav_name" subst_value="True">$(arg uav_name)</rosparam>
-  <rosparam param="lio_sam/imuType" subst_value="True">$(arg imu_type)</rosparam>
+  <rosparam param="liosam/imuType" subst_value="True">$(arg imu_type)</rosparam>
   
-  <!-- LIO_SAM nodelets -->
-  <node pkg="nodelet" type="nodelet" name="imu_preintegration" args="$(arg nodelet) lio_sam/ImuPreintegration $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+  <!-- liosam nodelets -->
+  <node pkg="nodelet" type="nodelet" name="imu_preintegration" args="$(arg nodelet) liosam/ImuPreintegration $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
   </node>
 
-  <node pkg="nodelet" type="nodelet" name="image_projection" args="$(arg nodelet) lio_sam/ImageProjection $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+  <node pkg="nodelet" type="nodelet" name="image_projection" args="$(arg nodelet) liosam/ImageProjection $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
   </node>
 
-  <node pkg="nodelet" type="nodelet" name="feature_extraction" args="$(arg nodelet) lio_sam/FeatureExtraction $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+  <node pkg="nodelet" type="nodelet" name="feature_extraction" args="$(arg nodelet) liosam/FeatureExtraction $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
   </node>
 
-  <node pkg="nodelet" type="nodelet" name="map_optimization" args="$(arg nodelet) lio_sam/MapOptimization $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
-      <!-- <remap from="lio_sam/mapping/cloud_registered_raw" to="aloam/scan_registered" /> -->
+  <node pkg="nodelet" type="nodelet" name="map_optimization" args="$(arg nodelet) liosam/MapOptimization $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+      <!-- <remap from="liosam/mapping/cloud_registered_raw" to="aloam/scan_registered" /> -->
   </node>
 
 
-  <!-- LIO_SAM nodes -->
+  <!-- liosam nodes -->
   <!-- <node pkg="$(arg project)" type="$(arg project)_imuPreintegration" name="$(arg project)_imuPreintegration" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" /> -->
   <!-- <node pkg="$(arg project)" type="$(arg project)_imageProjection"   name="$(arg project)_imageProjection"   output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" /> -->
   <!-- <node pkg="$(arg project)" type="$(arg project)_featureExtraction" name="$(arg project)_featureExtraction" output="screen" respawn="false" launch-prefix="$(arg launch_prefix)" /> -->

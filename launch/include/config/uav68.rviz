@@ -54,7 +54,7 @@ Visualization Manager:
           Length: 1
           Name: map
           Radius: 0.10000000149011612
-          Reference Frame: uav68/lio_sam_origin
+          Reference Frame: uav68/liosam_origin
           Value: true
         - Class: rviz/Axes
           Enabled: true
@@ -166,7 +166,7 @@ Visualization Manager:
             Shaft Length: 1
             Shaft Radius: 0.05000000074505806
             Value: Axes
-          Topic: /lio_sam/mapping/odometry
+          Topic: /liosam/mapping/odometry
           Unreliable: false
           Value: false
         - Angle Tolerance: 0.009999999776482582
@@ -262,7 +262,7 @@ Visualization Manager:
           Size (Pixels): 3
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /lio_sam/mapping/cloud_registered
+          Topic: /liosam/mapping/cloud_registered
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -296,7 +296,7 @@ Visualization Manager:
           Size (Pixels): 10
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /lio_sam/feature/cloud_corner
+          Topic: /liosam/feature/cloud_corner
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -326,7 +326,7 @@ Visualization Manager:
           Size (Pixels): 8
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /lio_sam/feature/cloud_surface
+          Topic: /liosam/feature/cloud_surface
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -360,7 +360,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /lio_sam/mapping/cloud_registered
+          Topic: /liosam/mapping/cloud_registered
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -390,7 +390,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.10000000149011612
           Style: Flat Squares
-          Topic: /lio_sam/mapping/map_local
+          Topic: /liosam/mapping/map_local
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -420,7 +420,7 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.009999999776482582
           Style: Points
-          Topic: /lio_sam/mapping/map_global
+          Topic: /liosam/mapping/map_global
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
@@ -445,7 +445,7 @@ Visualization Manager:
           Radius: 0.029999999329447746
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /lio_sam/mapping/path
+          Topic: /liosam/mapping/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -468,7 +468,7 @@ Visualization Manager:
           Radius: 0.029999999329447746
           Shaft Diameter: 0.10000000149011612
           Shaft Length: 0.10000000149011612
-          Topic: /lio_sam/imu/path
+          Topic: /liosam/imu/path
           Unreliable: false
           Value: true
         - Alpha: 1
@@ -496,14 +496,14 @@ Visualization Manager:
           Size (Pixels): 2
           Size (m): 0.30000001192092896
           Style: Flat Squares
-          Topic: /lio_sam/mapping/icp_loop_closure_corrected_cloud
+          Topic: /liosam/mapping/icp_loop_closure_corrected_cloud
           Unreliable: false
           Use Fixed Frame: true
           Use rainbow: true
           Value: false
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /lio_sam/mapping/loop_closure_constraints
+          Marker Topic: /liosam/mapping/loop_closure_constraints
           Name: Loop constraint
           Namespaces:
             {}
@@ -515,7 +515,7 @@ Visualization Manager:
   Global Options:
     Background Color: 0; 0; 0
     Default Light: true
-    Fixed Frame: uav68/lio_sam_origin
+    Fixed Frame: uav68/liosam_origin
     Frame Rate: 30
   Name: root
   Tools:
@@ -543,7 +543,7 @@ Visualization Manager:
       Name: Current View
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5497971773147583
-      Target Frame: uav68/lio_sam_origin
+      Target Frame: uav68/liosam_origin
       Value: Orbit (rviz)
       Yaw: 2.7866714000701904
     Saved: ~

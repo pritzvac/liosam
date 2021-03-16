@@ -1,23 +1,23 @@
 <library path="lib/libImageProjection">
-  <class name="lio_sam/ImageProjection" type="lio_sam::image_projection::ImageProjection" base_class_type="nodelet::Nodelet">
+  <class name="liosam/ImageProjection" type="liosam::image_projection::ImageProjection" base_class_type="nodelet::Nodelet">
     <description>ImageProjection nodelet</description>
   </class>
 </library>
 
 <library path="lib/libFeatureExtraction">
-  <class name="lio_sam/FeatureExtraction" type="lio_sam::feature_extraction::FeatureExtraction" base_class_type="nodelet::Nodelet">
+  <class name="liosam/FeatureExtraction" type="liosam::feature_extraction::FeatureExtraction" base_class_type="nodelet::Nodelet">
     <description>FeatureExtraction nodelet</description>
   </class>
 </library>
 
 <library path="lib/libMapOptimization">
-  <class name="lio_sam/MapOptimization" type="lio_sam::map_optimization::MapOptimization" base_class_type="nodelet::Nodelet">
+  <class name="liosam/MapOptimization" type="liosam::map_optimization::MapOptimization" base_class_type="nodelet::Nodelet">
     <description>MapOptimization nodelet</description>
   </class>
 </library>
 
 <library path="lib/libImuPreintegration">
-  <class name="lio_sam/ImuPreintegration" type="lio_sam::imu_preintegration::ImuPreintegration" base_class_type="nodelet::Nodelet">
+  <class name="liosam/ImuPreintegration" type="liosam::imu_preintegration::ImuPreintegration" base_class_type="nodelet::Nodelet">
     <description>ImuPreintegration nodelet</description>
   </class>
 </library>

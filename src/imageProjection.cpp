@@ -1,5 +1,5 @@
 #include "utility.h"
-#include "lio_sam/cloud_info.h"
+#include "liosam/cloud_info.h"
 
 struct PointXYZIRT
 {
@@ -14,7 +14,7 @@ struct PointXYZIRT
 POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity,
                                                                                        intensity)(uint32_t, t, t)(uint8_t, ring, ring)(uint32_t, range, range))
 
-namespace lio_sam
+namespace liosam
 {
 namespace image_projection
 {
@@ -63,7 +63,7 @@ private:
   float odomIncreY;
   float odomIncreZ;
 
-  lio_sam::cloud_info::Ptr cloudInfo = boost::make_shared<lio_sam::cloud_info>();
+  liosam::cloud_info::Ptr cloudInfo = boost::make_shared<liosam::cloud_info>();
   double                   timeScanCur;
   double                   timeScanEnd;
   std_msgs::Header         cloudHeader;
@@ -77,8 +77,8 @@ public:
         nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjectionImpl::odometryHandler, this, ros::TransportHints().tcpNoDelay());
     subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjectionImpl::cloudHandler, this, ros::TransportHints().tcpNoDelay());
 
-    pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2>("lio_sam/deskew/cloud_deskewed", 1);
-    pubLaserCloudInfo = nh.advertise<lio_sam::cloud_info>("lio_sam/deskew/cloud_info", 1);
+    pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2>("liosam/deskew/cloud_deskewed", 1);
+    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/deskew/cloud_info", 1);
 
     allocateMemory();
     resetParameters();
@@ -646,7 +646,7 @@ private:
 //}
 
 }  // namespace image_projection
-}  // namespace lio_sam
+}  // namespace liosam
 
 #include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(lio_sam::image_projection::ImageProjection, nodelet::Nodelet)
+PLUGINLIB_EXPORT_CLASS(liosam::image_projection::ImageProjection, nodelet::Nodelet)

@@ -78,22 +78,22 @@
    <plot row="0" style="Lines" col="0">
     <range bottom="-166.884638" top="-73.487814" right="217.897550" left="212.915333"/>
     <limitY/>
-    <curve G="103" custom_transform="noTransform" B="189" name="/lio_sam/mapping/odometry/pose/position/x" R="148"/>
-    <curve G="39" custom_transform="noTransform" B="40" name="/uav68/lio_sam/odometry/imu/pose/position/x" R="214"/>
+    <curve G="103" custom_transform="noTransform" B="189" name="/liosam/mapping/odometry/pose/position/x" R="148"/>
+    <curve G="39" custom_transform="noTransform" B="40" name="/uav68/liosam/odometry/imu/pose/position/x" R="214"/>
     <transform value="noTransform"/>
    </plot>
    <plot row="0" style="Lines" col="1">
     <range bottom="140.597606" top="230.136174" right="217.897550" left="212.915333"/>
     <limitY/>
-    <curve G="190" custom_transform="noTransform" B="207" name="/lio_sam/mapping/odometry/pose/position/y" R="23"/>
-    <curve G="201" custom_transform="noTransform" B="56" name="/uav68/lio_sam/odometry/imu/pose/position/y" R="26"/>
+    <curve G="190" custom_transform="noTransform" B="207" name="/liosam/mapping/odometry/pose/position/y" R="23"/>
+    <curve G="201" custom_transform="noTransform" B="56" name="/uav68/liosam/odometry/imu/pose/position/y" R="26"/>
     <transform value="noTransform"/>
    </plot>
    <plot row="0" style="Lines" col="2">
     <range bottom="-457.726935" top="-382.752679" right="217.897550" left="212.915333"/>
     <limitY/>
-    <curve G="119" custom_transform="noTransform" B="180" name="/lio_sam/mapping/odometry/pose/position/z" R="31"/>
-    <curve G="127" custom_transform="noTransform" B="14" name="/uav68/lio_sam/odometry/imu/pose/position/z" R="255"/>
+    <curve G="119" custom_transform="noTransform" B="180" name="/liosam/mapping/odometry/pose/position/z" R="31"/>
+    <curve G="127" custom_transform="noTransform" B="14" name="/uav68/liosam/odometry/imu/pose/position/z" R="255"/>
     <transform value="noTransform"/>
    </plot>
   </plotmatrix>
