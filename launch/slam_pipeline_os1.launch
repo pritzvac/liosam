@@ -99,7 +99,7 @@
   <!--//}-->
 
   <!--//{ DATA PROCESSING NODELET -->
-  <include file="$(find mrs_pcl_tools)/launch/uav_os1_filtration.launch">
+  <include file="$(find mrs_pcl_tools)/launch/uav_os_filtration.launch">
     <arg name="nodelet" value="$(arg nodelet)" />
     <arg name="nodelet_manager" value="$(arg nodelet_manager)" />
     <arg name="launch_prefix" value="$(arg launch_prefix)" />
@@ -194,21 +194,5 @@
   <!--//}-->
  
   <!--//}-->
-
-    <!--//{ LAUNCH TOPICS THROTTLE -->
-    <group if="$(arg throttle)" ns="$(arg UAV_NAME)">
-      <node name="lidar3d_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/os1_cloud_node/points $(arg throttle/lidar3d/raw) /$(arg UAV_NAME)/os1_cloud_node/points/throttled" />
-      <node name="lidar3d_scan_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/os1_cloud_node/scan $(arg throttle/lidar3d/scan) /$(arg UAV_NAME)/os1_cloud_node/scan/throttled" />
-      <node name="lidar3d_processed_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/os1_cloud_node/points_processed $(arg throttle/lidar3d/processed) /$(arg UAV_NAME)/os1_cloud_node/points_processed/throttled" />
-      <node name="lidar3d_over_max_range_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/os1_cloud_node/points_over_max_range $(arg throttle/lidar3d/over_max_range) /$(arg UAV_NAME)/os1_cloud_node/points_over_max_range/throttled" />
-
-      <node name="map_occupied_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/map/occupied $(arg throttle/map/occupied) /$(arg UAV_NAME)/map/occupied/throttled" />
-      <node name="map_free_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/map/free $(arg throttle/map/free) /$(arg UAV_NAME)/map/free/throttled" />
-
-      <node name="aloam_path_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/aloam/path $(arg throttle/aloam/path) /$(arg UAV_NAME)/aloam/path/throttled" />
-      <node name="aloam_map_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/aloam/map $(arg throttle/aloam/map) /$(arg UAV_NAME)/aloam/map/throttled" />
-      <node name="aloam_scan_throttler" type="throttle" pkg="topic_tools" args="messages /$(arg UAV_NAME)/aloam/scan_registered $(arg throttle/aloam/scan_registered) /$(arg UAV_NAME)/aloam/scan_registered/throttled" />
-    </group>
-    <!--//}-->
 
 </launch>
