@@ -37,17 +37,9 @@
   <arg name="depth/minimum_grid_resolution" default="0.0" />
   <!--//}-->
 
-  <!--//{ ALOAM PARAMETERS -->
-  <arg name="aloam/verbose" default="false" />
-  <arg name="aloam/mapping/rate" default="$(arg frequency)" />
-  <arg name="aloam/mapping/publish_rate" default="0.5" />
-  <arg name="aloam/mapping/resolution/line" default="0.4" />
-  <arg name="aloam/mapping/resolution/plane" default="0.8" />
-  <!--//}-->
-
   <!--//{ OCTOMAP SERVER PARAMETERS -->
   <arg name="map_builder" default="true" />
-  <arg name="map_builder/topics" default="$(find octomap_server)/config/topics_empty_lio_sam.yaml" />
+  <arg name="map_builder/topics" default="$(find octomap_server)/config/topics_liosam.yaml" />
   <arg name="map_builder/resolution" default="0.20" />
   <arg name="map_builder/alpha/occupied" default="1.0" />
   <arg name="map_builder/alpha/free" default="1.0" />
@@ -129,7 +121,7 @@
   <!--//}-->
 
   <!--//{ OCTOMAP SERVER NODELET-->
-  <include if="$(arg map_builder)" file="$(find octomap_server)/launch/uav_os1_nodelet.launch">
+  <include if="$(arg map_builder)" file="$(find octomap_server)/launch/uav_nodelet.launch">
     <arg name="nodelet" value="$(arg nodelet)" />
     <arg name="nodelet_manager" value="$(arg nodelet_manager)" />
     <arg name="launch_prefix" value="$(arg launch_prefix)" />
@@ -164,35 +156,6 @@
   </include>
   <!--//}-->
 
-  <!--//{ ALOAM SLAM NODELET -->
-  <!-- <include file="$(find aloam_slam)/launch/uav_os1.launch"> -->
-  <!--   <arg name="UAV_NAME" value="$(arg UAV_NAME)"/> -->
-  <!--   <arg name="enable_profiler" value="$(arg PROFILER)" /> -->
-  
-  <!--   <arg name="fcu_frame" value="$(arg fcu_frame)"/> -->
-  <!--   <arg name="lidar_frame" value="$(arg lidar_frame)"/> -->
-  <!--   <arg name="odom_frame" value="$(arg odom_frame)"/> -->
-  <!--   <arg name="map_frame" value="$(arg map_frame)"/> -->
-
-  <!--   <arg name="points_topic" value="$(arg points_proc_topic)" /> -->
-  <!--   <arg name="number_of_rings" value="$(arg number_of_rings)" /> -->
-  <!--   <arg name="vertical_fov" value="$(arg vertical_fov)"/> -->
-  <!--   <arg name="sensor_frequency" value="$(arg frequency)"/> -->
-
-  <!--   <arg name="mapping_rate" value="$(arg aloam/mapping/rate)" /> -->
-  <!--   <arg name="map_publish_rate" value="$(arg aloam/mapping/publish_rate)" /> -->
-  <!--   <arg name="mapping_line_resolution" value="$(arg aloam/mapping/resolution/line)" /> -->
-  <!--   <arg name="mapping_plane_resolution" value="$(arg aloam/mapping/resolution/plane)" /> -->
-
-  <!--   <arg name="verbose" value="$(arg aloam/verbose)"/> -->
-  <!--   <arg name="nodelet" value="$(arg nodelet)" /> -->
-  <!--   <arg name="nodelet_manager" value="$(arg nodelet_manager)" /> -->
-  <!--   <arg name="launch_prefix" value="$(arg launch_prefix)" /> -->
-  <!--   <arg name="launch_delay" default="10" /> -->
-
-  <!-- </include> -->
-  <!--//}-->
- 
   <!--//}-->
 
 </launch>
