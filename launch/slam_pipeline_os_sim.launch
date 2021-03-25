@@ -9,8 +9,8 @@
   <!--//{ FRAMES -->
   <arg name="fcu_frame" default="$(arg UAV_NAME)/fcu"/>
   <arg name="lidar_frame" default="$(arg UAV_NAME)/os_sensor"/>
-  <arg name="odom_frame" default="$(arg UAV_NAME)/aloam_odom_origin"/>
-  <arg name="map_frame" default="$(arg UAV_NAME)/aloam_origin"/>
+  <arg name="odom_frame" default="$(arg UAV_NAME)/liosam_odom_origin"/>
+  <arg name="map_frame" default="$(arg UAV_NAME)/liosam_origin"/>
   <!--//}-->
 
   <!--//{ SENSOR PARAMETERS -->
