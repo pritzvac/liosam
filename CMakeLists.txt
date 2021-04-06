@@ -1,7 +1,20 @@
 cmake_minimum_required(VERSION 2.8.3)
+cmake_policy(SET CMP0048 NEW)
 project(liosam)
 
-set(CMAKE_CXX_FLAGS "-std=c++17 -fno-diagnostics-color")
+# Override CXX flags inherited from workspace, if precompiled PCL binaries from debian repos are used
+if (DEFINED ENV{PCL_CROSS_COMPILATION})
+  set(PCL_CROSS_COMPILATION $ENV{PCL_CROSS_COMPILATION})
+else()
+  set(PCL_CROSS_COMPILATION "true")
+endif()
+if(${PCL_CROSS_COMPILATION} STREQUAL "true")
+  message("Using precompiled PCL binaries from debian repos. Overriding catkin workspace CMAKE_CXX_FLAGS.")
+  set(CMAKE_CXX_FLAGS "-std=c++17")
+else()
+  message("Using custom-built PCL binaries. Inheriting all CMAKE_CXX_FLAGS from catkin workspace.")
+endif()
+
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -pthread")
 set(CMAKE_CXX_FLAGS_RELDEB "${CMAKE_CXX_FLAGS_RELDEB} -pthread")
 

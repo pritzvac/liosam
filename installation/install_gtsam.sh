@@ -14,6 +14,13 @@ distro=`lsb_release -r | awk '{ print $2 }'`
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
 GTSAM_PATH=$SCRIPT_PATH/../lib
 
+BUILD_WITH_MARCH_NATIVE=OFF
+if [ ! -z "$PCL_CROSS_COMPILATION" ]; then
+  if $PCL_CROSS_COMPILATION; then
+    BUILD_WITH_MARCH_NATIVE=ON
+  fi
+fi
+
 [ ! -d $GTSAM_PATH ] && mkdir -p $GTSAM_PATH
 cd $GTSAM_PATH
 
@@ -28,7 +35,7 @@ cd $GTSAM_PATH/gtsam-$GTSAM_VERSION/
 
 [ ! -d "build" ] && mkdir build
 cd build
-cmake -DGTSAM_BUILD_WITH_MARCH_NATIVE=OFF ..
+cmake -DGTSAM_BUILD_WITH_MARCH_NATIVE=$BUILD_WITH_MARCH_NATIVE ..
 make -j$[$(nproc) - 1]
 sudo make install
 
