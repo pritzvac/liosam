@@ -17,8 +17,13 @@ GTSAM_PATH=$SCRIPT_PATH/../lib
 BUILD_WITH_MARCH_NATIVE=OFF
 if [ ! -z "$PCL_CROSS_COMPILATION" ]; then
   if $PCL_CROSS_COMPILATION; then
+    echo "Compiling GTSAM optimizer with -march=native"
     BUILD_WITH_MARCH_NATIVE=ON
+  else
+    echo "Compiling GTSAM optimizer without -march=native"
   fi
+else
+    echo "Compiling GTSAM optimizer without -march=native"
 fi
 
 [ ! -d $GTSAM_PATH ] && mkdir -p $GTSAM_PATH
