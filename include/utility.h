@@ -344,9 +344,9 @@ public:
   }
 
   void addNamespace(const std::string &ns, std::string &s) {
-    if (s.find("/") != 0) {
+    const bool add_ns = s.rfind("/") != 0 && s.rfind(ns) != 0;
+    if (add_ns)
       s = ns + "/" + s;
-    }
   }
 };
 /*//}*/

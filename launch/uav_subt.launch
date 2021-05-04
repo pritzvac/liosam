@@ -1,0 +1,51 @@
+<launch>
+
+    <!-- ENV VARS -->
+    <arg name="UAV_NAME" default="$(env UAV_NAME)"/>
+    <arg name="UAV_TYPE" default="$(env UAV_TYPE)" />
+
+    <arg name="points_topic" default="os_cloud_nodelet/points_processed" />
+    <arg name="number_of_rings" default="128" />
+    <arg name="samples_per_ring" default="1024" />
+
+    <arg name="frame_baselink" default="$(arg UAV_NAME)/base_link" />
+    <arg name="frame_lidar" default="$(arg UAV_NAME)/os_sensor" />
+    <arg name="frame_odom" default="$(arg UAV_NAME)/slam_origin" />
+    <arg name="frame_map" default="$(arg UAV_NAME)/slam_mapping_origin" />
+
+    <arg name="launch_delay" default="0"/>
+    <arg name="launch_prefix" default="" />
+    <arg name="nodelet" default="standalone"/>
+    <arg name="nodelet_manager" default=""/>
+
+    <group ns="$(arg UAV_NAME)">
+
+      <!-- Parameters -->
+      <rosparam file="$(find liosam)/config/default.yaml" command="load" />
+      <rosparam file="$(find mission_controller)/custom_configs/liosam/subt_$(arg UAV_TYPE).yaml" command="load" />
+      <rosparam param="uav_name" subst_value="True">$(arg UAV_NAME)</rosparam>
+      <rosparam param="liosam/N_SCAN" subst_value="True">$(arg number_of_rings)</rosparam>
+      <rosparam param="liosam/Horizon_SCAN" subst_value="True">$(arg samples_per_ring)</rosparam>
+      <rosparam param="liosam/pointCloudTopic" subst_value="True">$(arg points_topic)</rosparam>
+      <rosparam param="liosam/lidarFrame" subst_value="True">$(arg points_topic)</rosparam>
+      <rosparam param="liosam/baselinkFrame" subst_value="True">$(arg points_topic)</rosparam>
+      <rosparam param="liosam/odometryFrame" subst_value="True">$(arg points_topic)</rosparam>
+      <rosparam param="liosam/mapFrame" subst_value="True">$(arg points_topic)</rosparam>
+
+      <node pkg="nodelet" type="nodelet" name="imu_preintegration" args="$(arg nodelet) liosam/ImuPreintegration $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+      </node>
+
+      <node pkg="nodelet" type="nodelet" name="image_projection" args="$(arg nodelet) liosam/ImageProjection $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+      </node>
+
+      <node pkg="nodelet" type="nodelet" name="feature_extraction" args="$(arg nodelet) liosam/FeatureExtraction $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+      </node>
+
+      <node pkg="nodelet" type="nodelet" name="map_optimization" args="$(arg nodelet) liosam/MapOptimization $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+        <remap from="liosam/mapping/cloud_registered_raw" to="aloam/scan_registered" />
+      </node>
+
+    </group>
+
+
+</launch>
