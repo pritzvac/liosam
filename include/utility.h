@@ -155,18 +155,18 @@ public:
     mrs_lib::ParamLoader pl(nh, ros::this_node::getName());
 
     pl.loadParam("uav_name", uav_name);
-    /* ROS_ERROR("[%s]: loaded uav_name: %s", ros::this_node::getName().c_str(), uav_name.c_str()); */
+    /* ROS_INFO("[%s]: loaded uav_name: %s", ros::this_node::getName().c_str(), uav_name.c_str()); */
 
     pl.loadParam("liosam/imuType", imuType);
-    ROS_ERROR("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+    ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
 
     pl.loadParam("liosam/pointCloudTopic", pointCloudTopic);
     addNamespace("/" + uav_name, pointCloudTopic);
 
-    /* ROS_ERROR("[%s]: loading imu_topic: %s", ros::this_node::getName().c_str(), std::string("liosam/" + imuType + "/imuTopic").c_str()); */
+    /* ROS_INFO("[%s]: loading imu_topic: %s", ros::this_node::getName().c_str(), std::string("liosam/" + imuType + "/imuTopic").c_str()); */
     pl.loadParam("liosam/" + imuType + "/imuTopic", imuTopic);
     addNamespace("/" + uav_name, imuTopic);
-    ROS_ERROR("[%s]: loaded imu_topic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
+    ROS_INFO("[%s]: loaded imu_topic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
 
     pl.loadParam("liosam/odomTopic", odomTopic);
     addNamespace("/" + uav_name, odomTopic);
