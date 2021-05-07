@@ -46,16 +46,16 @@ public:
 
 public:
   /*//{ TransformFusion() */
-  TransformFusion() {
+  TransformFusion(ros::NodeHandle& nh_) {
 
     subLaserOdometry =
-        nh.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        nh_.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
     subImuOdometry =
-        nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        nh_.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
 
-    pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic, 2000);
+    pubImuOdometry = nh_.advertise<nav_msgs::Odometry>(odomTopic, 2000);
     /* ROS_WARN("pubImuOdometry topic: %s", pubImuOdometry.getTopic().c_str()); */
-    pubImuPath = nh.advertise<nav_msgs::Path>("liosam/imu/path", 1);
+    pubImuPath = nh_.advertise<nav_msgs::Path>("liosam/imu/path", 1);
   }
   /*//}*/
 
@@ -217,12 +217,12 @@ public:
 
 public:
   /*//{ ImuPreintegrationImpl() */
-  ImuPreintegrationImpl() {
-    subImu      = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImuPreintegrationImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
-    subOdometry = nh.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 5, &ImuPreintegrationImpl::odometryHandler, this,
-                                                   ros::TransportHints().tcpNoDelay());
+  ImuPreintegrationImpl(ros::NodeHandle& nh_) {
+    subImu      = nh_.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImuPreintegrationImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
+    subOdometry = nh_.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 5, &ImuPreintegrationImpl::odometryHandler, this,
+                                                    ros::TransportHints().tcpNoDelay());
 
-    pubImuOdometry = nh.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 2000);
+    pubImuOdometry = nh_.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 2000);
 
     boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(imuGravity);
     p->accelerometerCovariance                       = gtsam::Matrix33::Identity(3, 3) * pow(imuAccNoise, 2);  // acc white noise in continuous
@@ -538,8 +538,8 @@ class ImuPreintegration : public nodelet::Nodelet {
 public:
   virtual void onInit() {
     ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    IP                  = std::make_unique<ImuPreintegrationImpl>();
-    TF                  = std::make_unique<TransformFusion>();
+    IP                  = std::make_unique<ImuPreintegrationImpl>(nh_);
+    TF                  = std::make_unique<TransformFusion>(nh_);
     ROS_INFO("\033[1;32m----> IMU Preintegration Started.\033[0m");
   };
 

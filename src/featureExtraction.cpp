@@ -42,13 +42,13 @@ public:
 
 public:
   /*//{ FeatureExtractionImpl() */
-  FeatureExtractionImpl() {
-    subLaserCloudInfo = nh.subscribe<liosam::cloud_info>("liosam/deskew/cloud_info", 1, &FeatureExtractionImpl::laserCloudInfoHandler, this,
-                                                         ros::TransportHints().tcpNoDelay());
+  FeatureExtractionImpl(ros::NodeHandle &nh_) {
+    subLaserCloudInfo = nh_.subscribe<liosam::cloud_info>("liosam/deskew/cloud_info", 1, &FeatureExtractionImpl::laserCloudInfoHandler, this,
+                                                          ros::TransportHints().tcpNoDelay());
 
-    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/feature/cloud_info", 1);
-    pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner", 1);
-    pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface", 1);
+    pubLaserCloudInfo = nh_.advertise<liosam::cloud_info>("liosam/feature/cloud_info", 1);
+    pubCornerPoints   = nh_.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner", 1);
+    pubSurfacePoints  = nh_.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface", 1);
 
     initializationValue();
   }
@@ -280,7 +280,7 @@ class FeatureExtraction : public nodelet::Nodelet {
 public:
   virtual void onInit() {
     ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    FE                  = std::make_unique<FeatureExtractionImpl>();
+    FE                  = std::make_unique<FeatureExtractionImpl>(nh_);
     ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
   };
 

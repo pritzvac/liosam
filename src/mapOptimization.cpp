@@ -150,31 +150,31 @@ public:
 
 public:
   /*//{ MapOptimizationImpl() */
-  MapOptimizationImpl() {
+  MapOptimizationImpl(ros::NodeHandle& nh_) {
     ISAM2Params parameters;
     parameters.relinearizeThreshold = 0.1;
     parameters.relinearizeSkip      = 1;
     isam                            = new ISAM2(parameters);
 
-    pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/trajectory", 1);
-    pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_global", 1);
-    pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry>("liosam/mapping/odometry", 1);
-    pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 1);
-    pubPath                     = nh.advertise<nav_msgs::Path>("liosam/mapping/path", 1);
+    pubKeyPoses                 = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/trajectory", 1);
+    pubLaserCloudSurround       = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_global", 1);
+    pubLaserOdometryGlobal      = nh_.advertise<nav_msgs::Odometry>("liosam/mapping/odometry", 1);
+    pubLaserOdometryIncremental = nh_.advertise<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 1);
+    pubPath                     = nh_.advertise<nav_msgs::Path>("liosam/mapping/path", 1);
 
-    subCloud =
-        nh.subscribe<liosam::cloud_info>("liosam/feature/cloud_info", 1, &MapOptimizationImpl::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-    subGPS  = nh.subscribe<nav_msgs::Odometry>(gpsTopic, 200, &MapOptimizationImpl::gpsHandler, this, ros::TransportHints().tcpNoDelay());
-    subLoop = nh.subscribe<std_msgs::Float64MultiArray>("liosam/loop_closure_detection", 1, &MapOptimizationImpl::loopInfoHandler, this,
-                                                        ros::TransportHints().tcpNoDelay());
+    subCloud = nh_.subscribe<liosam::cloud_info>("liosam/feature/cloud_info", 1, &MapOptimizationImpl::laserCloudInfoHandler, this,
+                                                 ros::TransportHints().tcpNoDelay());
+    subGPS   = nh_.subscribe<nav_msgs::Odometry>(gpsTopic, 200, &MapOptimizationImpl::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+    subLoop  = nh_.subscribe<std_msgs::Float64MultiArray>("liosam/loop_closure_detection", 1, &MapOptimizationImpl::loopInfoHandler, this,
+                                                         ros::TransportHints().tcpNoDelay());
 
-    pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_history_cloud", 1);
-    pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_corrected_cloud", 1);
-    pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("liosam/mapping/loop_closure_constraints", 1);
+    pubHistoryKeyFrames   = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_history_cloud", 1);
+    pubIcpKeyFrames       = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_corrected_cloud", 1);
+    pubLoopConstraintEdge = nh_.advertise<visualization_msgs::MarkerArray>("liosam/mapping/loop_closure_constraints", 1);
 
-    pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_local", 1);
-    pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered", 1);
-    pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_raw", 1);
+    pubRecentKeyFrames    = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_local", 1);
+    pubRecentKeyFrame     = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered", 1);
+    pubCloudRegisteredRaw = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_raw", 1);
 
     downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
     downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
@@ -1776,7 +1776,7 @@ class MapOptimization : public nodelet::Nodelet {
 public:
   virtual void onInit() {
     ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    MO                  = std::make_unique<MapOptimizationImpl>();
+    MO                  = std::make_unique<MapOptimizationImpl>(nh_);
     ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
 
     std::thread loopthread(&MapOptimizationImpl::loopClosureThread, MO);

@@ -71,14 +71,14 @@ private:
 
 public:
   /*//{ ImageProjectionImpl() */
-  ImageProjectionImpl() : deskewFlag(0) {
-    subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjectionImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
+  ImageProjectionImpl(ros::NodeHandle &nh_) : deskewFlag(0) {
+    subImu = nh_.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjectionImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
     subOdom =
-        nh.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjectionImpl::odometryHandler, this, ros::TransportHints().tcpNoDelay());
-    subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjectionImpl::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+        nh_.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjectionImpl::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+    subLaserCloud = nh_.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjectionImpl::cloudHandler, this, ros::TransportHints().tcpNoDelay());
 
-    pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2>("liosam/deskew/cloud_deskewed", 1);
-    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/deskew/cloud_info", 1);
+    pubExtractedCloud = nh_.advertise<sensor_msgs::PointCloud2>("liosam/deskew/cloud_deskewed", 1);
+    pubLaserCloudInfo = nh_.advertise<liosam::cloud_info>("liosam/deskew/cloud_info", 1);
 
     allocateMemory();
     resetParameters();
@@ -631,7 +631,7 @@ class ImageProjection : public nodelet::Nodelet {
 public:
   virtual void onInit() {
     ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    IP                  = std::make_unique<ImageProjectionImpl>();
+    IP                  = std::make_unique<ImageProjectionImpl>(nh_);
     ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
   };
 

@@ -23,16 +23,55 @@
 
     <!-- LIOSAM nodelets -->
     <node pkg="nodelet" type="nodelet" name="imu_preintegration" args="$(arg nodelet) liosam/ImuPreintegration $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
-    </node>
+
+        <!-- publishers -->
+        <remap from="~liosam/imu/path" to="liosam/imu/path" />
+
+        <!-- subscribers -->
+        <remap from="~liosam/mapping/odometry_incremental" to="liosam/mapping/odometry_incremental" />
+        <remap from="~liosam/mapping/odometry" to="liosam/mapping/odometry" />
+
+      </node>
 
     <node pkg="nodelet" type="nodelet" name="image_projection" args="$(arg nodelet) liosam/ImageProjection $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+
+      <!-- publishers -->
+      <remap from="~liosam/deskew/cloud_deskewed" to="liosam/deskew/cloud_deskewed" />
+      <remap from="~liosam/deskew/cloud_info" to="liosam/deskew/cloud_info" />
+
     </node>
 
     <node pkg="nodelet" type="nodelet" name="feature_extraction" args="$(arg nodelet) liosam/FeatureExtraction $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+
+      <!-- publishers -->
+      <remap from="~liosam/feature/cloud_info" to="liosam/feature/cloud_info" />
+      <remap from="~liosam/feature/cloud_corner" to="liosam/feature/cloud_corner" />
+      <remap from="~liosam/feature/cloud_surface" to="liosam/feature/cloud_surface" />
+
+      <!-- subscribers -->
+      <remap from="~liosam/deskew/cloud_info" to="liosam/deskew/cloud_info" />
+
     </node>
 
     <node pkg="nodelet" type="nodelet" name="map_optimization" args="$(arg nodelet) liosam/MapOptimization $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
-      <!-- <remap from="liosam/mapping/cloud_registered_raw" to="aloam/scan_registered" /> -->
+
+        <!-- publishers -->
+        <remap from="~liosam/mapping/trajectory" to="liosam/mapping/trajectory" />
+        <remap from="~liosam/mapping/map_global" to="liosam/mapping/map_global" />
+        <remap from="~liosam/mapping/odometry" to="liosam/mapping/odometry" />
+        <remap from="~liosam/mapping/odometry_incremental" to="liosam/mapping/odometry_incremental" />
+        <remap from="~liosam/mapping/path" to="liosam/mapping/path" />
+        <remap from="~liosam/mapping/icp_loop_closure_history_cloud" to="liosam/mapping/icp_loop_closure_history_cloud" />
+        <remap from="~liosam/mapping/icp_loop_closure_corrected_cloud" to="liosam/mapping/icp_loop_closure_corrected_cloud" />
+        <remap from="~liosam/mapping/loop_closure_constraints" to="liosam/mapping/loop_closure_constraints" />
+        <remap from="~liosam/mapping/map_local" to="liosam/mapping/map_local" />
+        <remap from="~liosam/mapping/cloud_registered" to="liosam/mapping/cloud_registered" />
+        <remap from="~liosam/mapping/cloud_registered_raw" to="liosam/mapping/cloud_registered_raw" />
+
+        <!-- subscribers -->
+        <remap from="~liosam/feature/cloud_info" to="liosam/feature/cloud_info" />
+        <remap from="~liosam/loop_closure_detection" to="liosam/loop_closure_detection" />
+
     </node>
 
     <!--- Run Rviz-->
