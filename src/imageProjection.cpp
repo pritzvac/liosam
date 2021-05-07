@@ -64,9 +64,9 @@ private:
   float odomIncreZ;
 
   liosam::cloud_info::Ptr cloudInfo = boost::make_shared<liosam::cloud_info>();
-  double                   timeScanCur;
-  double                   timeScanEnd;
-  std_msgs::Header         cloudHeader;
+  double                  timeScanCur;
+  double                  timeScanEnd;
+  std_msgs::Header        cloudHeader;
 
 
 public:
@@ -288,7 +288,7 @@ public:
 
     for (int i = 0; i < (int)imuQueue.size(); ++i) {
       sensor_msgs::Imu thisImuMsg     = imuQueue[i];
-      double           currentImuTime = thisImuMsg.header.stamp.toSec();
+      const double     currentImuTime = thisImuMsg.header.stamp.toSec();
 
       // get roll, pitch, and yaw estimation for this scan
       if (currentImuTime <= timeScanCur) {
@@ -313,7 +313,7 @@ public:
       imuAngular2rosAngular(&thisImuMsg, &angular_x, &angular_y, &angular_z);
 
       // integrate rotation
-      double timeDiff        = currentImuTime - imuTime[imuPointerCur - 1];
+      const double timeDiff  = currentImuTime - imuTime[imuPointerCur - 1];
       imuRotX[imuPointerCur] = imuRotX[imuPointerCur - 1] + angular_x * timeDiff;
       imuRotY[imuPointerCur] = imuRotY[imuPointerCur - 1] + angular_y * timeDiff;
       imuRotZ[imuPointerCur] = imuRotZ[imuPointerCur - 1] + angular_z * timeDiff;
@@ -403,15 +403,15 @@ public:
       return;
     }
 
-    Eigen::Affine3f transBegin =
+    const Eigen::Affine3f transBegin =
         pcl::getTransformation(startOdomMsg.pose.pose.position.x, startOdomMsg.pose.pose.position.y, startOdomMsg.pose.pose.position.z, roll, pitch, yaw);
 
     tf::quaternionMsgToTF(endOdomMsg.pose.pose.orientation, orientation);
     tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-    Eigen::Affine3f transEnd =
+    const Eigen::Affine3f transEnd =
         pcl::getTransformation(endOdomMsg.pose.pose.position.x, endOdomMsg.pose.pose.position.y, endOdomMsg.pose.pose.position.z, roll, pitch, yaw);
 
-    Eigen::Affine3f transBt = transBegin.inverse() * transEnd;
+    const Eigen::Affine3f transBt = transBegin.inverse() * transEnd;
 
     float rollIncre, pitchIncre, yawIncre;
     pcl::getTranslationAndEulerAngles(transBt, odomIncreX, odomIncreY, odomIncreZ, rollIncre, pitchIncre, yawIncre);
@@ -439,12 +439,12 @@ public:
       *rotYCur = imuRotY[imuPointerFront];
       *rotZCur = imuRotZ[imuPointerFront];
     } else {
-      int    imuPointerBack = imuPointerFront - 1;
-      double ratioFront     = (pointTime - imuTime[imuPointerBack]) / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-      double ratioBack      = (imuTime[imuPointerFront] - pointTime) / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
-      *rotXCur              = imuRotX[imuPointerFront] * ratioFront + imuRotX[imuPointerBack] * ratioBack;
-      *rotYCur              = imuRotY[imuPointerFront] * ratioFront + imuRotY[imuPointerBack] * ratioBack;
-      *rotZCur              = imuRotZ[imuPointerFront] * ratioFront + imuRotZ[imuPointerBack] * ratioBack;
+      const int    imuPointerBack = imuPointerFront - 1;
+      const double ratioFront     = (pointTime - imuTime[imuPointerBack]) / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
+      const double ratioBack      = (imuTime[imuPointerFront] - pointTime) / (imuTime[imuPointerFront] - imuTime[imuPointerBack]);
+      *rotXCur                    = imuRotX[imuPointerFront] * ratioFront + imuRotX[imuPointerBack] * ratioBack;
+      *rotYCur                    = imuRotY[imuPointerFront] * ratioFront + imuRotY[imuPointerBack] * ratioBack;
+      *rotZCur                    = imuRotZ[imuPointerFront] * ratioFront + imuRotZ[imuPointerBack] * ratioBack;
     }
   }
   /*//}*/
@@ -474,7 +474,7 @@ public:
       return *point;
     }
 
-    double pointTime = timeScanCur + relTime;
+    const double pointTime = timeScanCur + relTime;
 
     float rotXCur, rotYCur, rotZCur;
     findRotation(pointTime, &rotXCur, &rotYCur, &rotZCur);
@@ -488,8 +488,8 @@ public:
     }
 
     // transform points to start
-    Eigen::Affine3f transFinal = pcl::getTransformation(posXCur, posYCur, posZCur, rotXCur, rotYCur, rotZCur);
-    Eigen::Affine3f transBt    = transStartInverse * transFinal;
+    const Eigen::Affine3f transFinal = pcl::getTransformation(posXCur, posYCur, posZCur, rotXCur, rotYCur, rotZCur);
+    const Eigen::Affine3f transBt    = transStartInverse * transFinal;
 
     PointType newPoint;
     newPoint.x         = transBt(0, 0) * point->x + transBt(0, 1) * point->y + transBt(0, 2) * point->z + transBt(0, 3);
@@ -525,7 +525,7 @@ public:
         /* ROS_ERROR("Downsampling. Throwing away row: %d", rowIdn); */
         continue;
       }
-      
+
       PointType thisPoint;
       thisPoint.x         = laserCloudIn->points.at(i).x;
       thisPoint.y         = laserCloudIn->points.at(i).y;
@@ -533,9 +533,9 @@ public:
       thisPoint.intensity = laserCloudIn->points.at(i).intensity;
 
       // TODO: polish this monstrosity
-      const float  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
-      static float ang_res_x    = 360.0 / float(Horizon_SCAN);
-      int          columnIdn    = -round((horizonAngle - 90.0) / ang_res_x) + Horizon_SCAN / 2;
+      const double  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180.0 / M_PI;
+      static double ang_res_x    = 360.0 / double(Horizon_SCAN);
+      int           columnIdn    = -int(std::round((horizonAngle - 90.0) / ang_res_x) + double(Horizon_SCAN) / 2.0);
       if (columnIdn >= Horizon_SCAN) {
         columnIdn -= Horizon_SCAN;
       }

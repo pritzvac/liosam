@@ -288,10 +288,11 @@ public:
   pcl::PointCloud<PointType>::Ptr transformPointCloud(pcl::PointCloud<PointType>::Ptr cloudIn, PointTypePose* transformIn) {
     pcl::PointCloud<PointType>::Ptr cloudOut(new pcl::PointCloud<PointType>());
 
-    int cloudSize = cloudIn->size();
+    const int cloudSize = cloudIn->size();
     cloudOut->resize(cloudSize);
 
-    Eigen::Affine3f transCur = pcl::getTransformation(transformIn->x, transformIn->y, transformIn->z, transformIn->roll, transformIn->pitch, transformIn->yaw);
+    const Eigen::Affine3f transCur =
+        pcl::getTransformation(transformIn->x, transformIn->y, transformIn->z, transformIn->roll, transformIn->pitch, transformIn->yaw);
 
 #pragma omp parallel for num_threads(numberOfCores)
     for (int i = 0; i < cloudSize; ++i) {
@@ -478,7 +479,7 @@ public:
 
   /*//{ performLoopClosure() */
   void performLoopClosure() {
-    if (cloudKeyPoses3D->points.empty() == true) {
+    if (cloudKeyPoses3D->points.empty()) {
       return;
     }
 
@@ -490,8 +491,8 @@ public:
     // find keys
     int loopKeyCur;
     int loopKeyPre;
-    if (detectLoopClosureExternal(&loopKeyCur, &loopKeyPre) == false) {
-      if (detectLoopClosureDistance(&loopKeyCur, &loopKeyPre) == false) {
+    if (!detectLoopClosureExternal(&loopKeyCur, &loopKeyPre)) {
+      if (!detectLoopClosureDistance(&loopKeyCur, &loopKeyPre)) {
         return;
       }
     }
@@ -524,7 +525,7 @@ public:
     pcl::PointCloud<PointType>::Ptr unused_result(new pcl::PointCloud<PointType>());
     icp.align(*unused_result);
 
-    if (icp.hasConverged() == false || icp.getFitnessScore() > historyKeyframeFitnessScore) {
+    if (!icp.hasConverged() || icp.getFitnessScore() > historyKeyframeFitnessScore) {
       return;
     }
 
@@ -540,16 +541,16 @@ public:
     Eigen::Affine3f correctionLidarFrame;
     correctionLidarFrame = icp.getFinalTransformation();
     // transform from world origin to wrong pose
-    Eigen::Affine3f tWrong = pclPointToAffine3f(copy_cloudKeyPoses6D->points[loopKeyCur]);
+    const Eigen::Affine3f tWrong = pclPointToAffine3f(copy_cloudKeyPoses6D->points[loopKeyCur]);
     // transform from world origin to corrected pose
-    Eigen::Affine3f tCorrect = correctionLidarFrame * tWrong;  // pre-multiplying -> successive rotation about a fixed frame
+    const Eigen::Affine3f tCorrect = correctionLidarFrame * tWrong;  // pre-multiplying -> successive rotation about a fixed frame
     pcl::getTranslationAndEulerAngles(tCorrect, x, y, z, roll, pitch, yaw);
-    gtsam::Pose3  poseFrom = Pose3(Rot3::RzRyRx(roll, pitch, yaw), Point3(x, y, z));
-    gtsam::Pose3  poseTo   = pclPointTogtsamPose3(copy_cloudKeyPoses6D->points[loopKeyPre]);
-    gtsam::Vector Vector6(6);
-    float         noiseScore = icp.getFitnessScore();
+    const gtsam::Pose3 poseFrom = Pose3(Rot3::RzRyRx(roll, pitch, yaw), Point3(x, y, z));
+    const gtsam::Pose3 poseTo   = pclPointTogtsamPose3(copy_cloudKeyPoses6D->points[loopKeyPre]);
+    gtsam::Vector      Vector6(6);
+    const double       noiseScore = icp.getFitnessScore();
     Vector6 << noiseScore, noiseScore, noiseScore, noiseScore, noiseScore, noiseScore;
-    noiseModel::Diagonal::shared_ptr constraintNoise = noiseModel::Diagonal::Variances(Vector6);
+    const noiseModel::Diagonal::shared_ptr constraintNoise = noiseModel::Diagonal::Variances(Vector6);
 
     // Add pose constraint
     mtx.lock();
@@ -565,11 +566,11 @@ public:
 
   /*//{ detectLoopClosureDistance() */
   bool detectLoopClosureDistance(int* latestID, int* closestID) {
-    int loopKeyCur = copy_cloudKeyPoses3D->size() - 1;
-    int loopKeyPre = -1;
+    const int loopKeyCur = int(copy_cloudKeyPoses3D->size()) - 1;
+    int       loopKeyPre = -1;
 
     // check loop constraint added before
-    auto it = loopIndexContainer.find(loopKeyCur);
+    const auto it = loopIndexContainer.find(loopKeyCur);
     if (it != loopIndexContainer.end()) {
       return false;
     }
@@ -610,15 +611,15 @@ public:
       return false;
     }
 
-    double loopTimeCur = loopInfoVec.front().data[0];
-    double loopTimePre = loopInfoVec.front().data[1];
+    const double loopTimeCur = loopInfoVec.front().data[0];
+    const double loopTimePre = loopInfoVec.front().data[1];
     loopInfoVec.pop_front();
 
     if (abs(loopTimeCur - loopTimePre) < historyKeyframeSearchTimeDiff) {
       return false;
     }
 
-    int cloudSize = copy_cloudKeyPoses6D->size();
+    const int cloudSize = copy_cloudKeyPoses6D->size();
     if (cloudSize < 2) {
       return false;
     }
@@ -627,7 +628,7 @@ public:
     loopKeyCur = cloudSize - 1;
     for (int i = cloudSize - 1; i >= 0; --i) {
       if (copy_cloudKeyPoses6D->points[i].time >= loopTimeCur) {
-        loopKeyCur = round(copy_cloudKeyPoses6D->points[i].intensity);
+        loopKeyCur = int(round(copy_cloudKeyPoses6D->points[i].intensity));
       } else {
         break;
       }
@@ -637,7 +638,7 @@ public:
     loopKeyPre = 0;
     for (int i = 0; i < cloudSize; ++i) {
       if (copy_cloudKeyPoses6D->points[i].time <= loopTimePre) {
-        loopKeyPre = round(copy_cloudKeyPoses6D->points[i].intensity);
+        loopKeyPre = int(round(copy_cloudKeyPoses6D->points[i].intensity));
       } else {
         break;
       }
@@ -647,7 +648,7 @@ public:
       return false;
     }
 
-    auto it = loopIndexContainer.find(loopKeyCur);
+    const auto it = loopIndexContainer.find(loopKeyCur);
     if (it != loopIndexContainer.end()) {
       return false;
     }
@@ -663,9 +664,9 @@ public:
   void loopFindNearKeyframes(pcl::PointCloud<PointType>::Ptr& nearKeyframes, const int& key, const int& searchNum) {
     // extract near keyframes
     nearKeyframes->clear();
-    int cloudSize = copy_cloudKeyPoses6D->size();
+    const int cloudSize = copy_cloudKeyPoses6D->size();
     for (int i = -searchNum; i <= searchNum; ++i) {
-      int keyNear = key + i;
+      const int keyNear = key + i;
       if (keyNear < 0 || keyNear >= cloudSize) {
         continue;
       }
@@ -724,8 +725,8 @@ public:
     markerEdge.color.a            = 1;
 
     for (auto it = loopIndexContainer.begin(); it != loopIndexContainer.end(); ++it) {
-      int                  key_cur = it->first;
-      int                  key_pre = it->second;
+      const int            key_cur = it->first;
+      const int            key_pre = it->second;
       geometry_msgs::Point p;
       p.x = copy_cloudKeyPoses6D->points[key_cur].x;
       p.y = copy_cloudKeyPoses6D->points[key_cur].y;
@@ -773,16 +774,16 @@ public:
     // use imu pre-integration estimation for pose guess
     static bool            lastImuPreTransAvailable = false;
     static Eigen::Affine3f lastImuPreTransformation;
-    if (cloudInfo.odomAvailable == true) {
-      Eigen::Affine3f transBack = pcl::getTransformation(cloudInfo.initialGuessX, cloudInfo.initialGuessY, cloudInfo.initialGuessZ, cloudInfo.initialGuessRoll,
-                                                         cloudInfo.initialGuessPitch, cloudInfo.initialGuessYaw);
-      if (lastImuPreTransAvailable == false) {
+    if (cloudInfo.odomAvailable) {
+      const Eigen::Affine3f transBack = pcl::getTransformation(cloudInfo.initialGuessX, cloudInfo.initialGuessY, cloudInfo.initialGuessZ,
+                                                               cloudInfo.initialGuessRoll, cloudInfo.initialGuessPitch, cloudInfo.initialGuessYaw);
+      if (!lastImuPreTransAvailable) {
         lastImuPreTransformation = transBack;
         lastImuPreTransAvailable = true;
       } else {
-        Eigen::Affine3f transIncre = lastImuPreTransformation.inverse() * transBack;
-        Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
-        Eigen::Affine3f transFinal = transTobe * transIncre;
+        const Eigen::Affine3f transIncre = lastImuPreTransformation.inverse() * transBack;
+        const Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
+        const Eigen::Affine3f transFinal = transTobe * transIncre;
         pcl::getTranslationAndEulerAngles(transFinal, transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], transformTobeMapped[0],
                                           transformTobeMapped[1], transformTobeMapped[2]);
 
@@ -795,12 +796,12 @@ public:
     }
 
     // use imu incremental estimation for pose guess (only rotation)
-    if (cloudInfo.imuAvailable == true) {
-      Eigen::Affine3f transBack  = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit);
-      Eigen::Affine3f transIncre = lastImuTransformation.inverse() * transBack;
+    if (cloudInfo.imuAvailable) {
+      const Eigen::Affine3f transBack  = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit);
+      const Eigen::Affine3f transIncre = lastImuTransformation.inverse() * transBack;
 
-      Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
-      Eigen::Affine3f transFinal = transTobe * transIncre;
+      const Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
+      const Eigen::Affine3f transFinal = transTobe * transIncre;
       pcl::getTranslationAndEulerAngles(transFinal, transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], transformTobeMapped[0],
                                         transformTobeMapped[1], transformTobeMapped[2]);
 
@@ -813,7 +814,7 @@ public:
   /*//{ extractForLoopClosure() */
   void extractForLoopClosure() {
     pcl::PointCloud<PointType>::Ptr cloudToExtract(new pcl::PointCloud<PointType>());
-    int                             numPoses = cloudKeyPoses3D->size();
+    const int                       numPoses = cloudKeyPoses3D->size();
     for (int i = numPoses - 1; i >= 0; --i) {
       if ((int)cloudToExtract->size() <= surroundingKeyframeSize) {
         cloudToExtract->push_back(cloudKeyPoses3D->points[i]);
@@ -845,7 +846,7 @@ public:
     downSizeFilterSurroundingKeyPoses.filter(*surroundingKeyPosesDS);
 
     // also extract some latest key frames in case the robot rotates in one position
-    int numPoses = cloudKeyPoses3D->size();
+    const int numPoses = cloudKeyPoses3D->size();
     for (int i = numPoses - 1; i >= 0; --i) {
       if (timeLaserInfoCur - cloudKeyPoses6D->points[i].time < 10.0) {
         surroundingKeyPosesDS->push_back(cloudKeyPoses3D->points[i]);
@@ -868,7 +869,7 @@ public:
         continue;
       }
 
-      int thisKeyInd = (int)cloudToExtract->points[i].intensity;
+      const int thisKeyInd = (int)cloudToExtract->points[i].intensity;
       if (laserCloudMapContainer.find(thisKeyInd) != laserCloudMapContainer.end()) {
         // transformed cloud available
         *laserCloudCornerFromMap += laserCloudMapContainer[thisKeyInd].first;
@@ -901,7 +902,7 @@ public:
 
   /*//{ extractSurroundingKeyFrames() */
   void extractSurroundingKeyFrames() {
-    if (cloudKeyPoses3D->points.empty() == true) {
+    if (cloudKeyPoses3D->points.empty()) {
       return;
     }
 
@@ -962,15 +963,15 @@ public:
           cy += laserCloudCornerFromMapDS->points[pointSearchInd[j]].y;
           cz += laserCloudCornerFromMapDS->points[pointSearchInd[j]].z;
         }
-        cx /= 5;
-        cy /= 5;
-        cz /= 5;
+        cx /= 5.0f;
+        cy /= 5.0f;
+        cz /= 5.0f;
 
         float a11 = 0, a12 = 0, a13 = 0, a22 = 0, a23 = 0, a33 = 0;
         for (int j = 0; j < 5; j++) {
-          float ax = laserCloudCornerFromMapDS->points[pointSearchInd[j]].x - cx;
-          float ay = laserCloudCornerFromMapDS->points[pointSearchInd[j]].y - cy;
-          float az = laserCloudCornerFromMapDS->points[pointSearchInd[j]].z - cz;
+          const float ax = laserCloudCornerFromMapDS->points[pointSearchInd[j]].x - cx;
+          const float ay = laserCloudCornerFromMapDS->points[pointSearchInd[j]].y - cy;
+          const float az = laserCloudCornerFromMapDS->points[pointSearchInd[j]].z - cz;
 
           a11 += ax * ax;
           a12 += ax * ay;
@@ -1000,31 +1001,34 @@ public:
 
         if (matD1.at<float>(0, 0) > 3 * matD1.at<float>(0, 1)) {
 
-          float x0 = pointSel.x;
-          float y0 = pointSel.y;
-          float z0 = pointSel.z;
-          float x1 = cx + 0.1 * matV1.at<float>(0, 0);
-          float y1 = cy + 0.1 * matV1.at<float>(0, 1);
-          float z1 = cz + 0.1 * matV1.at<float>(0, 2);
-          float x2 = cx - 0.1 * matV1.at<float>(0, 0);
-          float y2 = cy - 0.1 * matV1.at<float>(0, 1);
-          float z2 = cz - 0.1 * matV1.at<float>(0, 2);
+          const float x0 = pointSel.x;
+          const float y0 = pointSel.y;
+          const float z0 = pointSel.z;
+          const float x1 = cx + 0.1f * matV1.at<float>(0, 0);
+          const float y1 = cy + 0.1f * matV1.at<float>(0, 1);
+          const float z1 = cz + 0.1f * matV1.at<float>(0, 2);
+          const float x2 = cx - 0.1f * matV1.at<float>(0, 0);
+          const float y2 = cy - 0.1f * matV1.at<float>(0, 1);
+          const float z2 = cz - 0.1f * matV1.at<float>(0, 2);
 
-          float a012 = sqrt(((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) +
-                            ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1)) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1)) +
-                            ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1)) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1)));
+          const float a012 = sqrt(((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) +
+                                  ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1)) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1)) +
+                                  ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1)) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1)));
 
-          float l12 = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2) * (z1 - z2));
+          const float l12 = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2) + (z1 - z2) * (z1 - z2));
 
-          float la = ((y1 - y2) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) + (z1 - z2) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1))) / a012 / l12;
+          const float la =
+              ((y1 - y2) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) + (z1 - z2) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1))) / a012 / l12;
 
-          float lb = -((x1 - x2) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) - (z1 - z2) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1))) / a012 / l12;
+          const float lb =
+              -((x1 - x2) * ((x0 - x1) * (y0 - y2) - (x0 - x2) * (y0 - y1)) - (z1 - z2) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1))) / a012 / l12;
 
-          float lc = -((x1 - x2) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1)) + (y1 - y2) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1))) / a012 / l12;
+          const float lc =
+              -((x1 - x2) * ((x0 - x1) * (z0 - z2) - (x0 - x2) * (z0 - z1)) + (y1 - y2) * ((y0 - y1) * (z0 - z2) - (y0 - y2) * (z0 - z1))) / a012 / l12;
 
-          float ld2 = a012 / l12;
+          const float ld2 = a012 / l12;
 
-          float s = 1 - 0.9 * fabs(ld2);
+          const float s = 1.0f - 0.9f * fabs(ld2);
 
           coeff.x         = s * la;
           coeff.y         = s * lb;
@@ -1078,7 +1082,7 @@ public:
         float pc = matX0(2, 0);
         float pd = 1;
 
-        float ps = sqrt(pa * pa + pb * pb + pc * pc);
+        const float ps = sqrt(pa * pa + pb * pb + pc * pc);
         pa /= ps;
         pb /= ps;
         pc /= ps;
@@ -1094,9 +1098,9 @@ public:
         }
 
         if (planeValid) {
-          float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
+          const float pd2 = pa * pointSel.x + pb * pointSel.y + pc * pointSel.z + pd;
 
-          float s = 1 - 0.9 * fabs(pd2) / sqrt(sqrt(pointSel.x * pointSel.x + pointSel.y * pointSel.y + pointSel.z * pointSel.z));
+          const float s = 1.0f - 0.9f * fabs(pd2) / sqrt(sqrt(pointSel.x * pointSel.x + pointSel.y * pointSel.y + pointSel.z * pointSel.z));
 
           coeff.x         = s * pa;
           coeff.y         = s * pb;
@@ -1148,14 +1152,14 @@ public:
     // yaw = pitch          ---     yaw = roll
 
     // lidar -> camera
-    float srx = sin(transformTobeMapped[1]);
-    float crx = cos(transformTobeMapped[1]);
-    float sry = sin(transformTobeMapped[2]);
-    float cry = cos(transformTobeMapped[2]);
-    float srz = sin(transformTobeMapped[0]);
-    float crz = cos(transformTobeMapped[0]);
+    const float srx = sin(transformTobeMapped[1]);
+    const float crx = cos(transformTobeMapped[1]);
+    const float sry = sin(transformTobeMapped[2]);
+    const float cry = cos(transformTobeMapped[2]);
+    const float srz = sin(transformTobeMapped[0]);
+    const float crz = cos(transformTobeMapped[0]);
 
-    int laserCloudSelNum = laserCloudOri->size();
+    const int laserCloudSelNum = laserCloudOri->size();
     if (laserCloudSelNum < 50) {
       return false;
     }
@@ -1180,16 +1184,16 @@ public:
       coeff.z         = coeffSel->points[i].x;
       coeff.intensity = coeffSel->points[i].intensity;
       // in camera
-      float arx = (crx * sry * srz * pointOri.x + crx * crz * sry * pointOri.y - srx * sry * pointOri.z) * coeff.x +
-                  (-srx * srz * pointOri.x - crz * srx * pointOri.y - crx * pointOri.z) * coeff.y +
-                  (crx * cry * srz * pointOri.x + crx * cry * crz * pointOri.y - cry * srx * pointOri.z) * coeff.z;
+      const float arx = (crx * sry * srz * pointOri.x + crx * crz * sry * pointOri.y - srx * sry * pointOri.z) * coeff.x +
+                        (-srx * srz * pointOri.x - crz * srx * pointOri.y - crx * pointOri.z) * coeff.y +
+                        (crx * cry * srz * pointOri.x + crx * cry * crz * pointOri.y - cry * srx * pointOri.z) * coeff.z;
 
-      float ary = ((cry * srx * srz - crz * sry) * pointOri.x + (sry * srz + cry * crz * srx) * pointOri.y + crx * cry * pointOri.z) * coeff.x +
-                  ((-cry * crz - srx * sry * srz) * pointOri.x + (cry * srz - crz * srx * sry) * pointOri.y - crx * sry * pointOri.z) * coeff.z;
+      const float ary = ((cry * srx * srz - crz * sry) * pointOri.x + (sry * srz + cry * crz * srx) * pointOri.y + crx * cry * pointOri.z) * coeff.x +
+                        ((-cry * crz - srx * sry * srz) * pointOri.x + (cry * srz - crz * srx * sry) * pointOri.y - crx * sry * pointOri.z) * coeff.z;
 
-      float arz = ((crz * srx * sry - cry * srz) * pointOri.x + (-cry * crz - srx * sry * srz) * pointOri.y) * coeff.x +
-                  (crx * crz * pointOri.x - crx * srz * pointOri.y) * coeff.y +
-                  ((sry * srz + cry * crz * srx) * pointOri.x + (crz * sry - cry * srx * srz) * pointOri.y) * coeff.z;
+      const float arz = ((crz * srx * sry - cry * srz) * pointOri.x + (-cry * crz - srx * sry * srz) * pointOri.y) * coeff.x +
+                        (crx * crz * pointOri.x - crx * srz * pointOri.y) * coeff.y +
+                        ((sry * srz + cry * crz * srx) * pointOri.x + (crz * sry - cry * srx * srz) * pointOri.y) * coeff.z;
       // lidar -> camera
       matA.at<float>(i, 0) = arz;
       matA.at<float>(i, 1) = arx;
@@ -1214,8 +1218,8 @@ public:
       cv::eigen(matAtA, matE, matV);
       matV.copyTo(matV2);
 
-      isDegenerate      = false;
-      float eignThre[6] = {100, 100, 100, 100, 100, 100};
+      isDegenerate            = false;
+      const float eignThre[6] = {100, 100, 100, 100, 100, 100};
       for (int i = 5; i >= 0; i--) {
         if (matE.at<float>(0, i) < eignThre[i]) {
           for (int j = 0; j < 6; j++) {
@@ -1242,8 +1246,9 @@ public:
     transformTobeMapped[4] += matX.at<float>(4, 0);
     transformTobeMapped[5] += matX.at<float>(5, 0);
 
-    float deltaR = sqrt(pow(pcl::rad2deg(matX.at<float>(0, 0)), 2) + pow(pcl::rad2deg(matX.at<float>(1, 0)), 2) + pow(pcl::rad2deg(matX.at<float>(2, 0)), 2));
-    float deltaT = sqrt(pow(matX.at<float>(3, 0) * 100, 2) + pow(matX.at<float>(4, 0) * 100, 2) + pow(matX.at<float>(5, 0) * 100, 2));
+    const float deltaR =
+        sqrt(pow(pcl::rad2deg(matX.at<float>(0, 0)), 2) + pow(pcl::rad2deg(matX.at<float>(1, 0)), 2) + pow(pcl::rad2deg(matX.at<float>(2, 0)), 2));
+    const float deltaT = sqrt(pow(matX.at<float>(3, 0) * 100, 2) + pow(matX.at<float>(4, 0) * 100, 2) + pow(matX.at<float>(5, 0) * 100, 2));
 
     if (deltaR < 0.05 && deltaT < 0.05) {
       return true;  // converged
@@ -1271,7 +1276,7 @@ public:
 
         combineOptimizationCoeffs();
 
-        if (LMOptimization(iterCount) == true) {
+        if (LMOptimization(iterCount)) {
           break;
         }
       }
@@ -1285,9 +1290,9 @@ public:
 
   /*//{ transformUpdate() */
   void transformUpdate() {
-    if (cloudInfo.imuAvailable == true) {
+    if (cloudInfo.imuAvailable) {
       if (std::abs(cloudInfo.imuPitchInit) < 1.4) {
-        double         imuWeight = imuRPYWeight;
+        const double   imuWeight = imuRPYWeight;
         tf::Quaternion imuQuaternion;
         tf::Quaternion transformQuaternion;
         double         rollMid, pitchMid, yawMid;
@@ -1333,11 +1338,11 @@ public:
       return true;
     }
 
-    Eigen::Affine3f transStart   = pclPointToAffine3f(cloudKeyPoses6D->back());
-    Eigen::Affine3f transFinal   = pcl::getTransformation(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], transformTobeMapped[0],
-                                                        transformTobeMapped[1], transformTobeMapped[2]);
-    Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
-    float           x, y, z, roll, pitch, yaw;
+    const Eigen::Affine3f transStart   = pclPointToAffine3f(cloudKeyPoses6D->back());
+    const Eigen::Affine3f transFinal   = pcl::getTransformation(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], transformTobeMapped[0],
+                                                              transformTobeMapped[1], transformTobeMapped[2]);
+    const Eigen::Affine3f transBetween = transStart.inverse() * transFinal;
+    float                 x, y, z, roll, pitch, yaw;
     pcl::getTranslationAndEulerAngles(transBetween, x, y, z, roll, pitch, yaw);
 
     if (abs(roll) < surroundingkeyframeAddingAngleThreshold && abs(pitch) < surroundingkeyframeAddingAngleThreshold &&
@@ -1352,14 +1357,14 @@ public:
   /*//{ addOdomFactor() */
   void addOdomFactor() {
     if (cloudKeyPoses3D->points.empty()) {
-      noiseModel::Diagonal::shared_ptr priorNoise =
+      const noiseModel::Diagonal::shared_ptr priorNoise =
           noiseModel::Diagonal::Variances((Vector(6) << 1e-2, 1e-2, M_PI * M_PI, 1e8, 1e8, 1e8).finished());  // rad*rad, meter*meter
       gtSAMgraph.add(PriorFactor<Pose3>(0, trans2gtsamPose(transformTobeMapped), priorNoise));
       initialEstimate.insert(0, trans2gtsamPose(transformTobeMapped));
     } else {
-      noiseModel::Diagonal::shared_ptr odometryNoise = noiseModel::Diagonal::Variances((Vector(6) << 1e-6, 1e-6, 1e-6, 1e-4, 1e-4, 1e-4).finished());
-      gtsam::Pose3                     poseFrom      = pclPointTogtsamPose3(cloudKeyPoses6D->points.back());
-      gtsam::Pose3                     poseTo        = trans2gtsamPose(transformTobeMapped);
+      const noiseModel::Diagonal::shared_ptr odometryNoise = noiseModel::Diagonal::Variances((Vector(6) << 1e-6, 1e-6, 1e-6, 1e-4, 1e-4, 1e-4).finished());
+      const gtsam::Pose3                     poseFrom      = pclPointTogtsamPose3(cloudKeyPoses6D->points.back());
+      const gtsam::Pose3                     poseTo        = trans2gtsamPose(transformTobeMapped);
       gtSAMgraph.add(BetweenFactor<Pose3>(cloudKeyPoses3D->size() - 1, cloudKeyPoses3D->size(), poseFrom.between(poseTo), odometryNoise));
       initialEstimate.insert(cloudKeyPoses3D->size(), poseTo);
     }
@@ -1399,16 +1404,16 @@ public:
         gpsQueue.pop_front();
 
         // GPS too noisy, skip
-        float noise_x = thisGPS.pose.covariance[0];
-        float noise_y = thisGPS.pose.covariance[7];
-        float noise_z = thisGPS.pose.covariance[14];
+        const float noise_x = thisGPS.pose.covariance[0];
+        const float noise_y = thisGPS.pose.covariance[7];
+        float       noise_z = thisGPS.pose.covariance[14];
         if (noise_x > gpsCovThreshold || noise_y > gpsCovThreshold) {
           continue;
         }
 
-        float gps_x = thisGPS.pose.pose.position.x;
-        float gps_y = thisGPS.pose.pose.position.y;
-        float gps_z = thisGPS.pose.pose.position.z;
+        const float gps_x = thisGPS.pose.pose.position.x;
+        const float gps_y = thisGPS.pose.pose.position.y;
+        float       gps_z = thisGPS.pose.pose.position.z;
         if (!useGpsElevation) {
           gps_z   = transformTobeMapped[5];
           noise_z = 0.01;
@@ -1432,8 +1437,8 @@ public:
 
         gtsam::Vector Vector3(3);
         Vector3 << max(noise_x, 1.0f), max(noise_y, 1.0f), max(noise_z, 1.0f);
-        noiseModel::Diagonal::shared_ptr gps_noise = noiseModel::Diagonal::Variances(Vector3);
-        gtsam::GPSFactor                 gps_factor(cloudKeyPoses3D->size(), gtsam::Point3(gps_x, gps_y, gps_z), gps_noise);
+        const noiseModel::Diagonal::shared_ptr gps_noise = noiseModel::Diagonal::Variances(Vector3);
+        gtsam::GPSFactor                       gps_factor(cloudKeyPoses3D->size(), gtsam::Point3(gps_x, gps_y, gps_z), gps_noise);
         gtSAMgraph.add(gps_factor);
 
         aLoopIsClosed = true;
@@ -1450,10 +1455,10 @@ public:
     }
 
     for (int i = 0; i < (int)loopIndexQueue.size(); ++i) {
-      int                                     indexFrom    = loopIndexQueue[i].first;
-      int                                     indexTo      = loopIndexQueue[i].second;
-      gtsam::Pose3                            poseBetween  = loopPoseQueue[i];
-      gtsam::noiseModel::Diagonal::shared_ptr noiseBetween = loopNoiseQueue[i];
+      const int                                     indexFrom    = loopIndexQueue[i].first;
+      const int                                     indexTo      = loopIndexQueue[i].second;
+      const gtsam::Pose3                            poseBetween  = loopPoseQueue[i];
+      const gtsam::noiseModel::Diagonal::shared_ptr noiseBetween = loopNoiseQueue[i];
       gtSAMgraph.add(BetweenFactor<Pose3>(indexFrom, indexTo, poseBetween, noiseBetween));
     }
 
@@ -1563,7 +1568,7 @@ public:
       // clear path
       globalPath->poses.clear();
       // update key poses
-      int numPoses = isamCurrentEstimate.size();
+      const int numPoses = isamCurrentEstimate.size();
       for (int i = 0; i < numPoses; ++i) {
         cloudKeyPoses3D->points[i].x = isamCurrentEstimate.at<Pose3>(i).translation().x();
         cloudKeyPoses3D->points[i].y = isamCurrentEstimate.at<Pose3>(i).translation().y();
@@ -1619,7 +1624,7 @@ public:
     T_lidar.setOrigin(tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
     T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));
 
-    tf::Transform T_odom = T * T_lidar;
+    const tf::Transform T_odom = T * T_lidar;
 
     // Publish in fcu frame
     nav_msgs::Odometry::Ptr laserOdometryROS = boost::make_shared<nav_msgs::Odometry>();
@@ -1662,7 +1667,7 @@ public:
     static bool                    lastIncreOdomPubFlag = false;
     static nav_msgs::Odometry::Ptr laserOdomIncremental = boost::make_shared<nav_msgs::Odometry>();  // incremental odometry msg
     static Eigen::Affine3f         increOdomAffine;                                                  // incremental odometry in affine
-    if (lastIncreOdomPubFlag == false) {
+    if (!lastIncreOdomPubFlag) {
       lastIncreOdomPubFlag = true;
       laserOdomIncremental = laserOdometryROS;
       increOdomAffine      = trans2Affine3f(transformTobeMapped);
@@ -1671,9 +1676,9 @@ public:
       increOdomAffine             = increOdomAffine * affineIncre;
       float x, y, z, roll, pitch, yaw;
       pcl::getTranslationAndEulerAngles(increOdomAffine, x, y, z, roll, pitch, yaw);
-      if (cloudInfo.imuAvailable == true) {
+      if (cloudInfo.imuAvailable) {
         if (std::abs(cloudInfo.imuPitchInit) < 1.4) {
-          double         imuWeight = 0.1;
+          const double   imuWeight = 0.1;
           tf::Quaternion imuQuaternion;
           tf::Quaternion transformQuaternion;
           double         rollMid, pitchMid, yawMid;

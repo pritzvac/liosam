@@ -166,7 +166,7 @@ public:
 
         int largestPickedNum = 0;
         for (int k = ep; k >= sp; k--) {
-          int ind = cloudSmoothness[k].ind;
+          const int ind = cloudSmoothness[k].ind;
           if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] > edgeThreshold) {
             largestPickedNum++;
             if (largestPickedNum <= 20) {
@@ -178,14 +178,14 @@ public:
 
             cloudNeighborPicked[ind] = 1;
             for (int l = 1; l <= 5; l++) {
-              int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l - 1]));
+              const int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l - 1]));
               if (columnDiff > 10) {
                 break;
               }
               cloudNeighborPicked[ind + l] = 1;
             }
             for (int l = -1; l >= -5; l--) {
-              int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l + 1]));
+              const int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l + 1]));
               if (columnDiff > 10) {
                 break;
               }
@@ -195,7 +195,7 @@ public:
         }
 
         for (int k = sp; k <= ep; k++) {
-          int ind = cloudSmoothness[k].ind;
+          const int ind = cloudSmoothness[k].ind;
           if (cloudNeighborPicked[ind] == 0 && cloudCurvature[ind] < surfThreshold) {
 
             cloudLabel[ind]          = -1;
@@ -203,7 +203,7 @@ public:
 
             for (int l = 1; l <= 5; l++) {
 
-              int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l - 1]));
+              const int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l - 1]));
               if (columnDiff > 10) {
                 break;
               }
@@ -212,7 +212,7 @@ public:
             }
             for (int l = -1; l >= -5; l--) {
 
-              int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l + 1]));
+              const int columnDiff = std::abs(int(cloud_info->pointColInd[ind + l] - cloud_info->pointColInd[ind + l + 1]));
               if (columnDiff > 10) {
                 break;
               }
