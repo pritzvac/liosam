@@ -140,14 +140,10 @@ public:
     // debug IMU data
     /* cout << std::setprecision(6); */
     /* cout << "IMU acc: " << endl; */
-    /* cout << "x: " << thisImu.linear_acceleration.x << */
-    /*       ", y: " << thisImu.linear_acceleration.y << */
-    /*       ", z: " << thisImu.linear_acceleration.z << endl; */
+    /* cout << "x: " << thisImu.linear_acceleration.x << ", y: " << thisImu.linear_acceleration.y << ", z: " << thisImu.linear_acceleration.z << endl; */
     /* cout << "IMU gyro: " << endl; */
-    /* cout << "x: " << thisImu.angular_velocity.x << */
-    /*       ", y: " << thisImu.angular_velocity.y << */
-    /*       ", z: " << thisImu.angular_velocity.z << endl; */
-    /* double imuRoll, imuPitch, imuYaw; */
+    /* cout << "x: " << thisImu.angular_velocity.x << ", y: " << thisImu.angular_velocity.y << ", z: " << thisImu.angular_velocity.z << endl; */
+    /* double         imuRoll, imuPitch, imuYaw; */
     /* tf::Quaternion orientation; */
     /* tf::quaternionMsgToTF(thisImu.orientation, orientation); */
     /* tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw); */
@@ -533,9 +529,9 @@ public:
       thisPoint.intensity = laserCloudIn->points.at(i).intensity;
 
       // TODO: polish this monstrosity
-      const double  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180.0 / M_PI;
-      static double ang_res_x    = 360.0 / double(Horizon_SCAN);
-      int           columnIdn    = -int(std::round((horizonAngle - 90.0) / ang_res_x) + double(Horizon_SCAN) / 2.0);
+      const float  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
+      static float ang_res_x    = 360.0 / float(Horizon_SCAN);
+      int          columnIdn    = -round((horizonAngle - 90.0) / ang_res_x) + Horizon_SCAN / 2;
       if (columnIdn >= Horizon_SCAN) {
         columnIdn -= Horizon_SCAN;
       }
