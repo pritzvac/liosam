@@ -40,3 +40,10 @@ liosam:
 
   # Loop closure
   loopClosureEnableFlag: false
+
+  # Motor speed
+  mass: 2.0 # kg
+  propMass: 0.005 # kg
+  numMotors: 4
+  motorConstant: 12.68433
+  momentConstant: 0.016

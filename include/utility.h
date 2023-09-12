@@ -54,6 +54,8 @@
 
 #include <mrs_lib/param_loader.h>
 
+#include <mrs_msgs/Float64ArrayStamped.h>
+
 using namespace std;
 
 typedef pcl::PointXYZI PointType;
@@ -68,6 +70,7 @@ public:
   // Topics
   string pointCloudTopic;
   string imuTopic;
+  string motorSpeedTopic;
   string odomTopic;
   string gpsTopic;
 
@@ -103,14 +106,22 @@ public:
 
   // IMU
   string             imuType;
-  float              imuAccNoise;
-  float              imuGyrNoise;
   float              imuAccBiasN;
   float              imuGyrBiasN;
   float              imuGravity;
   float              imuRPYWeight;
   Eigen::Matrix3d    extRot;
   Eigen::Quaterniond extQRPY;
+
+  float              linAccNoise;
+  float              angAccNoise;
+
+  // Motor Speeds
+  float mass;
+  int numMotors;
+  float propMass;
+  float motorConstant;
+  float momentConstant;
 
   // LOAM
   float edgeThreshold;
@@ -200,13 +211,20 @@ public:
     pl.loadParam("liosam/lidarMinRange", lidarMinRange, 0.1f);
     pl.loadParam("liosam/lidarMaxRange", lidarMaxRange, 1000.0f);
 
-    pl.loadParam("liosam/" + imuType + "/imuAccNoise", imuAccNoise, 0.01f);
-    pl.loadParam("liosam/" + imuType + "/imuGyrNoise", imuGyrNoise, 0.001f);
     pl.loadParam("liosam/" + imuType + "/imuAccBiasN", imuAccBiasN, 0.0002f);
     pl.loadParam("liosam/" + imuType + "/imuGyrBiasN", imuGyrBiasN, 0.00003f);
     pl.loadParam("liosam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
     pl.loadParam("liosam/imuGravity", imuGravity, 9.80511f);
     /* pl.loadMatrixStatic("liosam/" + imuType + "/extrinsicRot", extRot, 3, 3); */
+
+    pl.loadParam("liosam/linAccNoise", linAccNoise, 0.01f);
+    pl.loadParam("liosam/angAccNoise", angAccNoise, 0.001f);
+
+    pl.loadParam("liosam/mass", mass, 3.0f);
+    pl.loadParam("liosam/numMotors", numMotors, 4);
+    pl.loadParam("liosam/propMass", propMass, 0.005f);
+    pl.loadParam("liosam/motorConstant", motorConstant, 10.0f);
+    pl.loadParam("liosam/momentConstant", momentConstant, 0.01f);
 
     pl.loadParam("liosam/edgeThreshold", edgeThreshold, 0.1f);
     pl.loadParam("liosam/surfThreshold", surfThreshold, 0.1f);

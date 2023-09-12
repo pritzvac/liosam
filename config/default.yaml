@@ -34,14 +34,17 @@ liosam:
   # Default IMU params
   imuGravity: 9.80511
   # Acc/Gyr noise/bias can be found using https://github.com/gaowenliang/imu_utils
+  
+  linAccNoise: 0.001
+  angAccNoise: 0.001
  
   # Mavros IMU real
   mavros_imu:
     frame: "fcu"
     imuTopic: "mavros/imu/data"
     imuRPYWeight: 0.01
-    imuAccNoise: 0.006
-    imuGyrNoise: 0.00018665
+    # imuAccNoise: 0.006
+    # imuGyrNoise: 0.00018665
     imuAccBiasN: 0.006
     imuGyrBiasN: 0.000038785
     # lidar -> imu tf

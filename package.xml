@@ -23,6 +23,7 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
+  <depend>mrs_msgs</depend>
   <depend>visualization_msgs</depend>
 
 
@@ -31,6 +32,7 @@
 
   <depend>mrs_lib</depend>
   <depend>GTSAM</depend>
+  <depend>gtsam_playground</depend>
 
   <export>
     <nodelet plugin="${prefix}/plugins.xml" />

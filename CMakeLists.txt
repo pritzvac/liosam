@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.1.2)
 cmake_policy(SET CMP0048 NEW)
 project(liosam)
 
@@ -38,6 +38,8 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   visualization_msgs
   mrs_lib
+  mrs_msgs
+  gtsam_playground
 )
 
 find_package(OpenMP REQUIRED)
@@ -58,6 +60,7 @@ generate_messages(
   std_msgs
   nav_msgs
   sensor_msgs
+  mrs_msgs
 )
 
 catkin_package(
@@ -73,6 +76,8 @@ catkin_package(
   message_generation
   visualization_msgs
   mrs_lib
+  mrs_msgs
+  gtsam_playground
 )
 
 # add definitions
