@@ -134,6 +134,8 @@ public:
   void imuHandler(const sensor_msgs::Imu::ConstPtr &imuMsg) {
     const sensor_msgs::Imu thisImu = imuConverter(*imuMsg);
 
+    ROS_INFO_ONCE("[ImageProjection]: imuHandler first callback");
+
     std::lock_guard<std::mutex> lock1(imuLock);
     imuQueue.push_back(thisImu);
 
@@ -154,6 +156,9 @@ public:
 
   /*//{ odometryHandler() */
   void odometryHandler(const nav_msgs::Odometry::ConstPtr &odometryMsg) {
+
+    ROS_INFO_ONCE("[ImageProjection]: odometryHandler first callback");
+
     std::lock_guard<std::mutex> lock2(odoLock);
     odomQueue.push_back(*odometryMsg);
   }
@@ -161,6 +166,8 @@ public:
 
   /*//{ cloudHandler() */
   void cloudHandler(const sensor_msgs::PointCloud2::ConstPtr &laserCloudMsg) {
+
+    ROS_INFO_ONCE("[ImageProjection]: cloudHandler first callback");
     if (!cachePointCloud(laserCloudMsg)) {
       return;
     }

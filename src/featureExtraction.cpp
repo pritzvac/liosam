@@ -72,6 +72,7 @@ public:
 
   /*//{ laserCloudInfoHandler() */
   void laserCloudInfoHandler(const liosam::cloud_info::ConstPtr &msgIn) {
+    ROS_INFO_ONCE("[FeatureExtraction]: laserCloudInfoHandler first callback");
     pcl::fromROSMsg(msgIn->cloud_deskewed, *extractedCloud);  // new cloud for extraction
 
     calculateSmoothness(msgIn);

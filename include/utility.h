@@ -179,6 +179,10 @@ public:
     addNamespace("/" + uav_name, imuTopic);
     ROS_INFO("[%s]: loaded imu_topic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
 
+    pl.loadParam("liosam/motorSpeedTopic", motorSpeedTopic);
+    addNamespace("/" + uav_name, motorSpeedTopic);
+    ROS_INFO("[%s]: loaded motor_speed_topic: %s", ros::this_node::getName().c_str(), motorSpeedTopic.c_str());
+
     pl.loadParam("liosam/odomTopic", odomTopic);
     addNamespace("/" + uav_name, odomTopic);
 

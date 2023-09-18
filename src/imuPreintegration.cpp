@@ -260,6 +260,7 @@ public:
 
     motorSpeedIntegratorPredict_ = new gtsam::PreintegratedMotorSpeedMeasurements(p);  // setting up the IMU integration for IMU message thread
     motorSpeedIntegratorOpt_ = new gtsam::PreintegratedMotorSpeedMeasurements(p);  // setting up the IMU integration for optimization
+    ROS_INFO("[ImuPreintegration]: initialized");
   }
   /*//}*/
 
@@ -288,6 +289,7 @@ public:
 
   /*//{ odometryHandler() */
   void odometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg) {
+    ROS_INFO_ONCE("[ImuPreintegration]: odometryHandler first callback");
     std::lock_guard<std::mutex> lock(mtx);
 
     const double currentCorrectionTime = ROS_TIME(odomMsg);
@@ -421,7 +423,7 @@ public:
     }
     // add imu factor to graph
     const gtsam::PreintegratedMotorSpeedMeasurements& preint_motor_speeds = dynamic_cast<const gtsam::PreintegratedMotorSpeedMeasurements&>(*motorSpeedIntegratorOpt_);
-    const gtsam::MotorSpeedFactor                     motor_speed_factor(X(key - 1), V(key - 1), W(key - 1), X(key), V(key), W(key - 1), B(key), preint_motor_speeds);
+    const gtsam::MotorSpeedFactor                     motor_speed_factor(X(key - 1), V(key - 1), W(key - 1), X(key), V(key), W(key), B(key), preint_motor_speeds);
     graphFactors.add(motor_speed_factor);
     // add imu bias between factor
     graphFactors.add(gtsam::BetweenFactor<gtsam::motor_speed_bias::ConstantBias>(
@@ -434,6 +436,7 @@ public:
     const gtsam::FullState propState_ = motorSpeedIntegratorOpt_->predict(prevState_, prevBias_);
     graphValues.insert(X(key), propState_.pose());
     graphValues.insert(V(key), propState_.v());
+    graphValues.insert(W(key), propState_.w());
     graphValues.insert(B(key), prevBias_);
     // optimize
     optimizer.update(graphFactors, graphValues);
@@ -511,12 +514,14 @@ public:
 
   /*//{ motorSpeedHandler() */
   void motorSpeedHandler(const mrs_msgs::Float64ArrayStamped::ConstPtr& msg_in) {
+    ROS_INFO_ONCE("[ImuPreintegration]: motorSpeedHandler first callback");
     std::lock_guard<std::mutex> lock(mtx);
 
     motorSpeedQueOpt.push_back(*msg_in);
     motorSpeedQueImu.push_back(*msg_in);
 
     if (doneFirstOpt == false) {
+      ROS_INFO_THROTTLE(1.0, "[ImuPreintegration]: waiting for first optimalization");
       return;
     }
 

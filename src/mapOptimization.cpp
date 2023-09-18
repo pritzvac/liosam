@@ -232,6 +232,7 @@ public:
 
   /*//{ laserCloudInfoHandler() */
   void laserCloudInfoHandler(const liosam::cloud_info::ConstPtr& msgIn) {
+    ROS_INFO_ONCE("[MapOptimization]: lasrCloudInfoHandler first callback");
     // extract time stamp
     timeLaserInfoStamp = msgIn->header.stamp;
     timeLaserInfoCur   = msgIn->header.stamp.toSec();

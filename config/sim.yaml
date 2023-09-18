@@ -47,3 +47,6 @@ liosam:
   numMotors: 4
   motorConstant: 12.68433
   momentConstant: 0.016
+
+  linAccNoise: 0.001
+  angAccNoise: 0.001
