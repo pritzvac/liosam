@@ -184,6 +184,8 @@ public:
   ros::Subscriber subMotorSpeed;
   ros::Subscriber subOdometry;
   ros::Publisher  pubImuOdometry;
+  ros::Publisher  pubLinAcc;
+  ros::Publisher  pubAngAcc;
 
   bool systemInitialized = false;
 
@@ -231,11 +233,13 @@ public:
 public:
   /*//{ MotorSpeedPreintegrationImpl() */
   MotorSpeedPreintegrationImpl(ros::NodeHandle& nh_) {
-    subMotorSpeed      = nh_.subscribe<mrs_msgs::Float64ArrayStamped>(motorSpeedTopic, 2000, &MotorSpeedPreintegrationImpl::motorSpeedHandler, this, ros::TransportHints().tcpNoDelay());
+    subMotorSpeed      = nh_.subscribe<mrs_msgs::Float64ArrayStamped>(motorSpeedTopic, 10, &MotorSpeedPreintegrationImpl::motorSpeedHandler, this, ros::TransportHints().tcpNoDelay());
     subOdometry = nh_.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 5, &MotorSpeedPreintegrationImpl::odometryHandler, this,
                                                     ros::TransportHints().tcpNoDelay());
 
-    pubImuOdometry = nh_.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 2000);
+    pubImuOdometry = nh_.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 10);
+    pubLinAcc = nh_.advertise<geometry_msgs::Vector3Stamped>("lin_acc", 10);
+    pubAngAcc = nh_.advertise<geometry_msgs::Vector3Stamped>("ang_acc", 10);
 
     boost::shared_ptr<gtsam::MotorSpeedParams> p = gtsam::MotorSpeedParams::MakeSharedU(imuGravity);
     p->setMass(mass + numMotors * propMass);
@@ -414,6 +418,7 @@ public:
         }
 
         motorSpeedIntegratorOpt_->integrateMeasurement(gtsam::Vector4(thisMotorSpeeds->values[0], thisMotorSpeeds->values[1], thisMotorSpeeds->values[2], thisMotorSpeeds->values[3]), dt);
+        ROS_INFO("[ImuPreintegration]: preintegrated: %.2f %.2f %.2f %.2f dt: %.2f", thisMotorSpeeds->values[0], thisMotorSpeeds->values[1], thisMotorSpeeds->values[2], thisMotorSpeeds->values[3], dt);
 
         lastMotorSpeedT_opt = imuTime;
         motorSpeedQueOpt.pop_front();
@@ -424,6 +429,9 @@ public:
     // add imu factor to graph
     const gtsam::PreintegratedMotorSpeedMeasurements& preint_motor_speeds = dynamic_cast<const gtsam::PreintegratedMotorSpeedMeasurements&>(*motorSpeedIntegratorOpt_);
     const gtsam::MotorSpeedFactor                     motor_speed_factor(X(key - 1), V(key - 1), W(key - 1), X(key), V(key), W(key), B(key), preint_motor_speeds);
+    const gtsam::Vector3 lin_acc_b = preint_motor_speeds.lastAcc();
+    const gtsam::Vector3 ang_acc_b = preint_motor_speeds.lastAlpha();
+    
     graphFactors.add(motor_speed_factor);
     // add imu bias between factor
     graphFactors.add(gtsam::BetweenFactor<gtsam::motor_speed_bias::ConstantBias>(
@@ -487,6 +495,22 @@ public:
         lastMotorSpeedQT = imuTime;
       }
     }
+
+    geometry_msgs::Vector3Stamped lin_acc_msg;
+    lin_acc_msg.header.stamp    = ros::Time::now();
+    lin_acc_msg.header.frame_id = "fcu";
+    lin_acc_msg.vector.x        = lin_acc_b[0];
+    lin_acc_msg.vector.y        = lin_acc_b[1];
+    lin_acc_msg.vector.z        = lin_acc_b[2];
+    pubLinAcc.publish(lin_acc_msg);
+
+    geometry_msgs::Vector3Stamped ang_acc_msg;
+    ang_acc_msg.header.stamp    = ros::Time::now();
+    ang_acc_msg.header.frame_id = "fcu";
+    ang_acc_msg.vector.x        = ang_acc_b[0];
+    ang_acc_msg.vector.y        = ang_acc_b[1];
+    ang_acc_msg.vector.z        = ang_acc_b[2];
+    pubAngAcc.publish(ang_acc_msg);
 
     ++key;
     doneFirstOpt = true;
