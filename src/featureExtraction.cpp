@@ -74,27 +74,18 @@ public:
     ROS_INFO("[FeatureExtraction]: 1");
     mrs_lib::ParamLoader pl(nh, "FeatureExtraction");
 
-    std::string config_file_path;
-    pl.loadParamReusable("config", config_file_path);
-
-  if (config_file_path != "") {
-    ROS_INFO("[FeatureExtraction]: adding config file");
-    pl.addYamlFile(config_file_path);
-    ROS_INFO("[FeatureExtraction]: added config file");
-  }
     ROS_INFO("[FeatureExtraction]: 2");
-    pl.loadParamReusable("uavName", uavName);
+    pl.loadParam("uavName", uavName);
 
     ROS_INFO("[FeatureExtraction]: 3");
-    /* pl.setPrefix("/"+uavName+"/"); */
 
     ROS_INFO("[FeatureExtraction]: 4");
-    pl.loadParamReusable("lidarFrame", lidarFrame, std::string("base_link"));
+    pl.loadParam("lidarFrame", lidarFrame);
     ROS_INFO("[FeatureExtraction]: 5");
     addNamespace(uavName, lidarFrame);
 
-    pl.loadParamReusable("numberOfRings", N_SCAN);
-    pl.loadParamReusable("samplesPerRing", Horizon_SCAN);
+    pl.loadParam("numberOfRings", N_SCAN);
+    pl.loadParam("samplesPerRing", Horizon_SCAN);
 
     pl.loadParam("odometrySurfLeafSize", odometrySurfLeafSize, 0.2f);
 
