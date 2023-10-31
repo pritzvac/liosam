@@ -1,5 +1,4 @@
 #include "utility.h"
-#include "liosam/cloud_info.h"
 
 #include <gtsam/geometry/Rot3.h>
 #include <gtsam/geometry/Pose3.h>
@@ -48,9 +47,85 @@ namespace map_optimization
 {
 
 /*//{ class MapOptimizationImpl() */
-class MapOptimizationImpl : public ParamServer {
+class MapOptimizationImpl {
 
 public:
+
+/*//{ parameters */
+
+  string uavName;
+
+  // Topics
+  string gpsTopic;
+
+  // Frames
+  std::string lidarFrame;
+  std::string imuFrame;
+  std::string baselinkFrame;
+  std::string odometryFrame;
+
+  // GPS Settings
+  bool  useImuHeadingInitialization;
+  bool  useGpsElevation;
+  float gpsCovThreshold;
+  float poseCovThreshold;
+
+  // LIDAR
+  int    N_SCAN;
+  int    Horizon_SCAN;
+
+  // IMU
+  string             imuType;
+  float              imuRPYWeight;
+
+  // LOAM
+  int   edgeFeatureMinValidNum;
+  int   surfFeatureMinValidNum;
+
+  // Voxel filter
+  float mappingCornerLeafSize;
+  float mappingSurfLeafSize;
+
+  // Transformation constraints
+  float z_tollerance;
+  float rotation_tollerance;
+
+  // Loop closure
+  bool  loopClosureEnableFlag;
+  float loopClosureFrequency;
+  int   surroundingKeyframeSize;
+  float historyKeyframeSearchRadius;
+  float historyKeyframeSearchTimeDiff;
+  int   historyKeyframeSearchNum;
+  float historyKeyframeFitnessScore;
+
+  // Global map visualization radius
+  float globalMapVisualizationSearchRadius;
+  float globalMapVisualizationPoseDensity;
+  float globalMapVisualizationLeafSize;
+
+  // CPU Params
+  double mappingProcessInterval;
+  int    numberOfCores;
+
+  // Surrounding map
+  float surroundingKeyframeDensity;
+  float surroundingKeyframeSearchRadius;
+  float surroundingkeyframeAddingDistThreshold;
+  float surroundingkeyframeAddingAngleThreshold;
+
+  // Save pcd
+  bool   savePCD;
+  string savePCDDirectory;
+/*//}*/
+
+  // TF
+  tf::StampedTransform  tfLidar2Baselink;
+
+  // IMU TF
+  Eigen::Matrix3d    extRot;
+  Eigen::Quaterniond extQRPY;
+
   // gtsam
   NonlinearFactorGraph gtSAMgraph;
   Values               initialEstimate;
@@ -151,6 +226,79 @@ public:
 public:
   /*//{ MapOptimizationImpl() */
   MapOptimizationImpl(ros::NodeHandle& nh_) {
+
+    /*//{ load parameters */
+    mrs_lib::ParamLoader pl(nh_, ros::this_node::getName());
+
+    pl.loadParam("uav_name", uavName);
+
+    pl.loadParam("liosam/imuType", imuType);
+    ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+
+    pl.loadParam("liosam/gpsTopic", gpsTopic, std::string("odometry/gps"));
+    addNamespace("/" + uavName, gpsTopic);
+
+    pl.loadParam("liosam/lidarFrame", lidarFrame, std::string("base_link"));
+    pl.loadParam("liosam/" + imuType + "/frame", imuFrame);
+    pl.loadParam("liosam/baselinkFrame", baselinkFrame, std::string("base_link"));
+    pl.loadParam("liosam/odometryFrame", odometryFrame, std::string("odom"));
+    addNamespace(uavName, lidarFrame);
+    addNamespace(uavName, imuFrame);
+    addNamespace(uavName, baselinkFrame);
+    addNamespace(uavName, odometryFrame);
+
+    pl.loadParam("liosam/useImuHeadingInitialization", useImuHeadingInitialization, false);
+    pl.loadParam("liosam/useGpsElevation", useGpsElevation, false);
+    pl.loadParam("liosam/gpsCovThreshold", gpsCovThreshold, 2.0f);
+    pl.loadParam("liosam/poseCovThreshold", poseCovThreshold, 25.0f);
+
+    pl.loadParam("liosam/savePCD", savePCD, false);
+    pl.loadParam("liosam/savePCDDirectory", savePCDDirectory, std::string("/Downloads/LOAM/"));
+
+    pl.loadParam("liosam/N_SCAN", N_SCAN);
+    pl.loadParam("liosam/Horizon_SCAN", Horizon_SCAN);
+
+    pl.loadParam("liosam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
+
+    pl.loadParam("liosam/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
+    pl.loadParam("liosam/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
+
+    pl.loadParam("liosam/mappingCornerLeafSize", mappingCornerLeafSize, 0.2f);
+    pl.loadParam("liosam/mappingSurfLeafSize", mappingSurfLeafSize, 0.2f);
+
+    pl.loadParam("liosam/z_tollerance", z_tollerance, FLT_MAX);
+    pl.loadParam("liosam/rotation_tollerance", rotation_tollerance, FLT_MAX);
+
+    pl.loadParam("liosam/numberOfCores", numberOfCores, 4);
+    pl.loadParam("liosam/mappingProcessInterval", mappingProcessInterval, 0.15);
+
+    pl.loadParam("liosam/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0f);
+    pl.loadParam("liosam/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2f);
+    pl.loadParam("liosam/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0f);
+    pl.loadParam("liosam/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0f);
+
+    pl.loadParam("liosam/loopClosureEnableFlag", loopClosureEnableFlag, false);
+    pl.loadParam("liosam/loopClosureFrequency", loopClosureFrequency, 1.0f);
+    pl.loadParam("liosam/surroundingKeyframeSize", surroundingKeyframeSize, 50);
+    pl.loadParam("liosam/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0f);
+    pl.loadParam("liosam/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0f);
+    pl.loadParam("liosam/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
+    pl.loadParam("liosam/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3f);
+
+    pl.loadParam("liosam/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3f);
+    pl.loadParam("liosam/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0f);
+    pl.loadParam("liosam/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0f);
+
+    if (!pl.loadedSuccessfully()) {
+      ROS_ERROR("[mapOptimization]: Could not load all parameters!");
+      ros::shutdown();
+    }
+
+/*//}*/
+
+    tf::StampedTransform tfLidar2Imu;
+    findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+
     ISAM2Params parameters;
     parameters.relinearizeThreshold = 0.1;
     parameters.relinearizeSkip      = 1;
@@ -248,20 +396,28 @@ public:
     if (timeLaserInfoCur - timeLastProcessing >= mappingProcessInterval) {
       timeLastProcessing = timeLaserInfoCur;
 
+      ROS_INFO("[MapOptimization]: updateInitialGuess()");
       updateInitialGuess();
 
+      ROS_INFO("[MapOptimization]: extractSurroundingKeyFrames()");
       extractSurroundingKeyFrames();
 
+      ROS_INFO("[MapOptimization]: downsampleCurrentScan()");
       downsampleCurrentScan();
 
+      ROS_INFO("[MapOptimization]: scan2MapOptimization()");
       scan2MapOptimization();
 
+      ROS_INFO("[MapOptimization]: saveKeyFramesAndFactor()");
       saveKeyFramesAndFactor();
 
+      ROS_INFO("[MapOptimization]: correctPoses()");
       correctPoses();
 
+      ROS_INFO("[MapOptimization]: publishOdometry()");
       publishOdometry();
 
+      ROS_INFO("[MapOptimization]: publishFrames()");
       publishFrames();
     }
   }
@@ -762,7 +918,10 @@ public:
     incrementalOdometryAffineFront = trans2Affine3f(transformTobeMapped);
 
     static Eigen::Affine3f lastImuTransformation;
+
     // initialization
+    // orientation is needed here to initialize the orientation of the map origin
+    // we can set it to orientation obtained from other source than IMU, e.g., orientation from HW API
     if (cloudKeyPoses3D->points.empty()) {
       transformTobeMapped[0] = cloudInfo.imuRollInit;
       transformTobeMapped[1] = cloudInfo.imuPitchInit;
@@ -789,6 +948,8 @@ public:
         const Eigen::Affine3f transIncre = lastImuPreTransformation.inverse() * transBack;
         const Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
         const Eigen::Affine3f transFinal = transTobe * transIncre;
+
+        // transformedTobeMapped will be used as initial guess in mapOptimization
         pcl::getTranslationAndEulerAngles(transFinal, transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5], transformTobeMapped[0],
                                           transformTobeMapped[1], transformTobeMapped[2]);
 
@@ -799,11 +960,14 @@ public:
         return;
       }
     }
-
-    // use imu incremental estimation for pose guess (only rotation)
+    
+    // this code section won't be reached if pre-integrated rotation is available
+    // if available, use imu incremental estimation for pose guess (only rotation)
+    // if not available, the pre-integrated rotation from above will be used
+    // therefore, IMU orientation is not necessary here
     if (cloudInfo.imuAvailable) {
       const Eigen::Affine3f transBack  = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit);
-      const Eigen::Affine3f transIncre = lastImuTransformation.inverse() * transBack;
+      const Eigen::Affine3f transIncre = lastImuTransformation.inverse() * transBack; // only place where lastImuTransformation is used
 
       const Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
       const Eigen::Affine3f transFinal = transTobe * transIncre;
@@ -1298,7 +1462,10 @@ public:
   /*//}*/
 
   /*//{ transformUpdate() */
+  // called after scan2Map LMOptimization - transformTobeMapped already contains the optimized transform
   void transformUpdate() {
+
+    // when IMU is available, the roll and pitch angles are interpolated between the transform and the IMU orientation
     if (cloudInfo.imuAvailable) {
       if (std::abs(cloudInfo.imuPitchInit) < 1.4) {
         const double   imuWeight = imuRPYWeight;
@@ -1365,11 +1532,14 @@ public:
 
   /*//{ addOdomFactor() */
   void addOdomFactor() {
+
+    // First pose prior
     if (cloudKeyPoses3D->points.empty()) {
       const noiseModel::Diagonal::shared_ptr priorNoise =
           noiseModel::Diagonal::Variances((Vector(6) << 1e-2, 1e-2, M_PI * M_PI, 1e8, 1e8, 1e8).finished());  // rad*rad, meter*meter
       gtSAMgraph.add(PriorFactor<Pose3>(0, trans2gtsamPose(transformTobeMapped), priorNoise));
       initialEstimate.insert(0, trans2gtsamPose(transformTobeMapped));
+
     } else {
       const noiseModel::Diagonal::shared_ptr odometryNoise = noiseModel::Diagonal::Variances((Vector(6) << 1e-6, 1e-6, 1e-6, 1e-4, 1e-4, 1e-4).finished());
       const gtsam::Pose3                     poseFrom      = pclPointTogtsamPose3(cloudKeyPoses6D->points.back());
@@ -1493,8 +1663,8 @@ public:
     // loop factor
     addLoopFactor();
 
-    // cout << "****************************************************" << endl;
-    // gtSAMgraph.print("GTSAM Graph:\n");
+    cout << "****************************************************" << endl;
+    gtSAMgraph.print("GTSAM Graph:\n");
 
     // update iSAM
     isam->update(gtSAMgraph, initialEstimate);
@@ -1630,6 +1800,7 @@ public:
     /* T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI)); // os_lidar -> os_sensor */
     T.setRotation(tf::createQuaternionFromRPY(0, 0, 0));  // os_sensor -> fcu
 
+    // transform from map to lidar
     T_lidar.setOrigin(tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
     T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));
 

@@ -1,5 +1,4 @@
 #include "utility.h"
-#include "liosam/cloud_info.h"
 
 struct PointXYZIRT
 {
@@ -12,7 +11,7 @@ struct PointXYZIRT
 } EIGEN_ALIGN16;
 
 POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity,
-                                                                                       intensity)(uint32_t, t, t)(uint8_t, ring, ring)(uint32_t, range, range))
+                                                                                       intensity)(std::uint32_t, t, t)(std::uint8_t, ring, ring)(std::uint32_t, range, range))
 
 namespace liosam
 {
@@ -22,7 +21,7 @@ namespace image_projection
 const int queueLength = 2000;
 
 /*//{ class ImageProjectionImpl() */
-class ImageProjectionImpl : public ParamServer {
+class ImageProjectionImpl {
 private:
   std::mutex imuLock;
   std::mutex odoLock;
@@ -68,10 +67,80 @@ private:
   double                  timeScanEnd;
   std_msgs::Header        cloudHeader;
 
+/*//{ parameters */
+
+  std::string uavName;
+
+  // Topics
+  string pointCloudTopic;
+  string imuTopic;
+  string odomTopic;
+
+  // Frames
+  std::string lidarFrame;
+  std::string imuFrame;
+  std::string baselinkFrame;
+
+  // LIDAR
+  int    N_SCAN;
+  int    Horizon_SCAN;
+  string timeField;
+  int    downsampleRate;
+  float  lidarMinRange;
+  float  lidarMaxRange;
+
+  // IMU
+  string             imuType;
+
+/*//}*/
+
+  // IMU TF
+  Eigen::Matrix3d    extRot;
+  Eigen::Quaterniond extQRPY;
 
 public:
+
   /*//{ ImageProjectionImpl() */
   ImageProjectionImpl(ros::NodeHandle &nh_) : deskewFlag(0) {
+
+/*//{ load parameters */
+    mrs_lib::ParamLoader pl(nh_, ros::this_node::getName());
+
+    pl.loadParam("uav_name", uavName);
+
+    pl.loadParam("imuType", imuType);
+    ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+
+    pl.loadParam(imuType + "/imuTopic", imuTopic);
+    addNamespace("/" + uavName, imuTopic);
+    ROS_INFO("[%s]: loaded imuTopic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
+
+    pl.loadParam("odomTopic", odomTopic);
+    addNamespace("/" + uavName, odomTopic);
+    ROS_INFO("[%s]: loaded odomTopic: %s", ros::this_node::getName().c_str(), odomTopic.c_str());
+
+    pl.loadParam("pointCloudTopic", pointCloudTopic);
+    addNamespace("/" + uavName, pointCloudTopic);
+    ROS_INFO("[%s]: loaded pointCloudTopic: %s", ros::this_node::getName().c_str(), pointCloudTopic.c_str());
+
+    pl.loadParam("lidarFrame", lidarFrame, std::string("base_link"));
+    pl.loadParam(imuType + "/frame", imuFrame);
+    pl.loadParam("baselinkFrame", baselinkFrame, std::string("base_link"));
+    addNamespace(uavName, lidarFrame);
+    addNamespace(uavName, imuFrame);
+    addNamespace(uavName, baselinkFrame);
+
+    pl.loadParam("numberOfRings", N_SCAN);
+    pl.loadParam("samplesPerRing", Horizon_SCAN);
+    pl.loadParam("timeField", timeField, std::string("t"));
+    pl.loadParam("downsampleRate", downsampleRate, 1);
+    pl.loadParam("lidarMinRange", lidarMinRange, 0.1f);
+    pl.loadParam("lidarMaxRange", lidarMaxRange, 1000.0f);
+/*//}*/
+
+    tf::StampedTransform tfLidar2Baselink, tfLidar2Imu;
+    findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+
     subImu = nh_.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjectionImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
     subOdom =
         nh_.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjectionImpl::odometryHandler, this, ros::TransportHints().tcpNoDelay());
@@ -132,7 +201,7 @@ public:
 
   /*//{ imuHandler() */
   void imuHandler(const sensor_msgs::Imu::ConstPtr &imuMsg) {
-    const sensor_msgs::Imu thisImu = imuConverter(*imuMsg);
+    const sensor_msgs::Imu thisImu = imuConverter(*imuMsg, extRot, extQRPY);
 
     ROS_INFO_ONCE("[ImageProjection]: imuHandler first callback");
 

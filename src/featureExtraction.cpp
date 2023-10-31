@@ -1,5 +1,4 @@
 #include "utility.h"
-#include "liosam/cloud_info.h"
 
 namespace liosam
 {
@@ -19,10 +18,29 @@ struct by_value
   }
 };
 
-/*//{ class FeatureExtractionImpl() */
-class FeatureExtractionImpl : public ParamServer {
+/*//{ class FeatureExtraction() */
+class FeatureExtraction : public nodelet::Nodelet {
 
 public:
+
+/*//{ parameters */
+  std::string uavName;
+
+  // Frames
+  std::string lidarFrame;
+
+  // LIDAR
+  int    N_SCAN;
+  int    Horizon_SCAN;
+
+  // LOAM
+  float edgeThreshold;
+  float surfThreshold;
+
+  // Voxel filter params
+  float odometrySurfLeafSize;
+/*//}*/
+
   ros::Subscriber subLaserCloudInfo;
 
   ros::Publisher pubLaserCloudInfo;
@@ -40,22 +58,72 @@ public:
   int *                     cloudNeighborPicked;
   int *                     cloudLabel;
 
+  bool is_initialized_ = false;
+
 public:
-  /*//{ FeatureExtractionImpl() */
-  FeatureExtractionImpl(ros::NodeHandle &nh_) {
-    subLaserCloudInfo = nh_.subscribe<liosam::cloud_info>("liosam/deskew/cloud_info", 1, &FeatureExtractionImpl::laserCloudInfoHandler, this,
+
+/*//{ onInit() */
+  virtual void onInit() {
+    ROS_INFO("[FeatureExtraction]: initializing");
+
+    ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+
+    ros::Time::waitForValid();
+
+/*//{ load params */
+    ROS_INFO("[FeatureExtraction]: 1");
+    mrs_lib::ParamLoader pl(nh, "FeatureExtraction");
+
+    std::string config_file_path;
+    pl.loadParamReusable("config", config_file_path);
+
+  if (config_file_path != "") {
+    ROS_INFO("[FeatureExtraction]: adding config file");
+    pl.addYamlFile(config_file_path);
+    ROS_INFO("[FeatureExtraction]: added config file");
+  }
+    ROS_INFO("[FeatureExtraction]: 2");
+    pl.loadParamReusable("uavName", uavName);
+
+    ROS_INFO("[FeatureExtraction]: 3");
+    /* pl.setPrefix("/"+uavName+"/"); */
+
+    ROS_INFO("[FeatureExtraction]: 4");
+    pl.loadParamReusable("lidarFrame", lidarFrame, std::string("base_link"));
+    ROS_INFO("[FeatureExtraction]: 5");
+    addNamespace(uavName, lidarFrame);
+
+    pl.loadParamReusable("numberOfRings", N_SCAN);
+    pl.loadParamReusable("samplesPerRing", Horizon_SCAN);
+
+    pl.loadParam("odometrySurfLeafSize", odometrySurfLeafSize, 0.2f);
+
+    pl.loadParam("edgeThreshold", edgeThreshold, 0.1f);
+    pl.loadParam("surfThreshold", surfThreshold, 0.1f);
+
+    if (!pl.loadedSuccessfully()) {
+      ROS_ERROR("[FeatureExtraction]: Could not load all parameters!");
+      ros::shutdown();
+    }
+/*//}*/
+
+    subLaserCloudInfo = nh.subscribe<liosam::cloud_info>("liosam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this,
                                                           ros::TransportHints().tcpNoDelay());
 
-    pubLaserCloudInfo = nh_.advertise<liosam::cloud_info>("liosam/feature/cloud_info", 1);
-    pubCornerPoints   = nh_.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner", 1);
-    pubSurfacePoints  = nh_.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface", 1);
+    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/feature/cloud_info", 1);
+    pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner", 1);
+    pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface", 1);
 
     initializationValue();
+
+    ROS_INFO("\033[1;32m----> [FeatureExtraction] initialized.\033[0m");
+    is_initialized_ = true;
   }
-  /*//}*/
+/*//}*/
 
   /*//{ initializationValue() */
   void initializationValue() {
+    ROS_INFO("[FeatureExtraction]: initializationValue start");
     cloudSmoothness.resize(N_SCAN * Horizon_SCAN);
 
     downSizeFilter.setLeafSize(odometrySurfLeafSize, odometrySurfLeafSize, odometrySurfLeafSize);
@@ -67,11 +135,17 @@ public:
     cloudCurvature      = new float[N_SCAN * Horizon_SCAN];
     cloudNeighborPicked = new int[N_SCAN * Horizon_SCAN];
     cloudLabel          = new int[N_SCAN * Horizon_SCAN];
+    ROS_INFO("[FeatureExtraction]: initializationValue end");
   }
   /*//}*/
 
   /*//{ laserCloudInfoHandler() */
   void laserCloudInfoHandler(const liosam::cloud_info::ConstPtr &msgIn) {
+
+    if (!is_initialized_) {
+      return;
+    }
+
     ROS_INFO_ONCE("[FeatureExtraction]: laserCloudInfoHandler first callback");
     pcl::fromROSMsg(msgIn->cloud_deskewed, *extractedCloud);  // new cloud for extraction
 
@@ -274,20 +348,6 @@ public:
 };
 /*//}*/
 
-/* //{ class FeatureExtraction */
-
-class FeatureExtraction : public nodelet::Nodelet {
-
-public:
-  virtual void onInit() {
-    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    FE                  = std::make_unique<FeatureExtractionImpl>(nh_);
-    ROS_INFO("\033[1;32m----> Feature Extraction Started.\033[0m");
-  };
-
-private:
-  std::shared_ptr<FeatureExtractionImpl> FE;
-};
 
 //}
 

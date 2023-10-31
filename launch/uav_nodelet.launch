@@ -6,7 +6,7 @@
   <arg name="nodelet" default="standalone"/>
   <arg name="nodelet_manager" default=""/>
   <arg name="launch_delay" default="0"/>
-  <arg name="launch_prefix" default=""/>
+  <arg name="launch_prefix" default="debug_roslaunch"/>
 
   <arg name="config_file" default="$(find liosam)/config/sim.yaml" />
     

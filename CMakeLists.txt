@@ -3,17 +3,17 @@ cmake_policy(SET CMP0048 NEW)
 project(liosam)
 
 # Override CXX flags inherited from workspace, if precompiled PCL binaries from debian repos are used
-if (DEFINED ENV{PCL_CROSS_COMPILATION})
-  set(PCL_CROSS_COMPILATION $ENV{PCL_CROSS_COMPILATION})
-else()
-  set(PCL_CROSS_COMPILATION "false")
-endif()
-if(${PCL_CROSS_COMPILATION} STREQUAL "false")
-  message("Using precompiled PCL binaries from debian repos. Overriding catkin workspace CMAKE_CXX_FLAGS.")
-  set(CMAKE_CXX_FLAGS "-std=c++17")
-else()
-  message("Using custom-built PCL binaries. Inheriting all CMAKE_CXX_FLAGS from catkin workspace.")
-endif()
+# if (DEFINED ENV{PCL_CROSS_COMPILATION})
+#   set(PCL_CROSS_COMPILATION $ENV{PCL_CROSS_COMPILATION})
+# else()
+#   set(PCL_CROSS_COMPILATION "false")
+# endif()
+# if(${PCL_CROSS_COMPILATION} STREQUAL "false")
+#   message("Using precompiled PCL binaries from debian repos. Overriding catkin workspace CMAKE_CXX_FLAGS.")
+#   set(CMAKE_CXX_FLAGS "-std=c++17")
+# else()
+#   message("Using custom-built PCL binaries. Inheriting all CMAKE_CXX_FLAGS from catkin workspace.")
+# endif()
 
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -pthread")
 set(CMAKE_CXX_FLAGS_RELDEB "${CMAKE_CXX_FLAGS_RELDEB} -pthread")
@@ -109,19 +109,19 @@ link_directories(
 ###########
 
 # Range Image Projection
-add_library(ImageProjection src/imageProjection.cpp)
-add_dependencies(ImageProjection
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_generate_messages_cpp
-  )
-target_link_libraries(ImageProjection
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${GTSAM_LIBRARIES}
-  )
+# add_library(ImageProjection src/imageProjection.cpp)
+# add_dependencies(ImageProjection
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#   ${catkin_EXPORTED_TARGETS}
+#   ${PROJECT_NAME}_generate_messages_cpp
+#   )
+# target_link_libraries(ImageProjection
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+#   ${Boost_LIBRARIES}
+#   ${GTSAM_LIBRARIES}
+#   )
 
 # Feature Association
 add_library(FeatureExtraction src/featureExtraction.cpp)
@@ -139,37 +139,37 @@ target_link_libraries(FeatureExtraction
   )
 
 # Mapping Optimization
-add_library(MapOptimization src/mapOptimization.cpp)
-add_dependencies(MapOptimization
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_generate_messages_cpp
-  )
-target_compile_options(MapOptimization
-  PRIVATE
-  ${OpenMP_CXX_FLAGS}
-  )
-target_link_libraries(MapOptimization
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${GTSAM_LIBRARIES}
-  gtsam
-  )
+# add_library(MapOptimization src/mapOptimization.cpp)
+# add_dependencies(MapOptimization
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#   ${catkin_EXPORTED_TARGETS}
+#   ${PROJECT_NAME}_generate_messages_cpp
+#   )
+# target_compile_options(MapOptimization
+#   PRIVATE
+#   ${OpenMP_CXX_FLAGS}
+#   )
+# target_link_libraries(MapOptimization
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+#   ${Boost_LIBRARIES}
+#   ${GTSAM_LIBRARIES}
+#   gtsam
+#   )
 
-# IMU Preintegration
-add_library(ImuPreintegration src/imuPreintegration.cpp)
-add_dependencies(ImuPreintegration
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_generate_messages_cpp
-  )
-target_link_libraries(ImuPreintegration
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${GTSAM_LIBRARIES}
-  gtsam
-  )
+# # IMU Preintegration
+# add_library(ImuPreintegration src/imuPreintegration.cpp)
+# add_dependencies(ImuPreintegration
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#   ${catkin_EXPORTED_TARGETS}
+#   ${PROJECT_NAME}_generate_messages_cpp
+#   )
+# target_link_libraries(ImuPreintegration
+#   ${catkin_LIBRARIES}
+#   ${PCL_LIBRARIES}
+#   ${OpenCV_LIBRARIES}
+#   ${Boost_LIBRARIES}
+#   ${GTSAM_LIBRARIES}
+#   gtsam
+#   )
