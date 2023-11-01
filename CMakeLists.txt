@@ -109,19 +109,16 @@ link_directories(
 ###########
 
 # Range Image Projection
-# add_library(ImageProjection src/imageProjection.cpp)
-# add_dependencies(ImageProjection
-#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
-#   ${catkin_EXPORTED_TARGETS}
-#   ${PROJECT_NAME}_generate_messages_cpp
-#   )
-# target_link_libraries(ImageProjection
-#   ${catkin_LIBRARIES}
-#   ${PCL_LIBRARIES}
-#   ${OpenCV_LIBRARIES}
-#   ${Boost_LIBRARIES}
-#   ${GTSAM_LIBRARIES}
-#   )
+add_library(ImageProjection src/imageProjection.cpp)
+add_dependencies(ImageProjection
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_link_libraries(ImageProjection
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  )
 
 # Feature Association
 add_library(FeatureExtraction src/featureExtraction.cpp)
@@ -133,43 +130,64 @@ add_dependencies(FeatureExtraction
 target_link_libraries(FeatureExtraction
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${GTSAM_LIBRARIES}
   )
 
 # Mapping Optimization
-# add_library(MapOptimization src/mapOptimization.cpp)
-# add_dependencies(MapOptimization
-#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
-#   ${catkin_EXPORTED_TARGETS}
-#   ${PROJECT_NAME}_generate_messages_cpp
-#   )
-# target_compile_options(MapOptimization
-#   PRIVATE
-#   ${OpenMP_CXX_FLAGS}
-#   )
-# target_link_libraries(MapOptimization
-#   ${catkin_LIBRARIES}
-#   ${PCL_LIBRARIES}
-#   ${OpenCV_LIBRARIES}
-#   ${Boost_LIBRARIES}
-#   ${GTSAM_LIBRARIES}
-#   gtsam
-#   )
+add_library(MapOptimization src/mapOptimization.cpp)
+add_dependencies(MapOptimization
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_compile_options(MapOptimization
+  PRIVATE
+  ${OpenMP_CXX_FLAGS}
+  )
+target_link_libraries(MapOptimization
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  gtsam
+  )
 
-# # IMU Preintegration
-# add_library(ImuPreintegration src/imuPreintegration.cpp)
-# add_dependencies(ImuPreintegration
-#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
-#   ${catkin_EXPORTED_TARGETS}
-#   ${PROJECT_NAME}_generate_messages_cpp
-#   )
-# target_link_libraries(ImuPreintegration
-#   ${catkin_LIBRARIES}
-#   ${PCL_LIBRARIES}
-#   ${OpenCV_LIBRARIES}
-#   ${Boost_LIBRARIES}
-#   ${GTSAM_LIBRARIES}
-#   gtsam
-#   )
+# IMU Preintegration
+add_library(ImuPreintegration src/imuPreintegration.cpp)
+add_dependencies(ImuPreintegration
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_link_libraries(ImuPreintegration
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  gtsam
+  )
+
+# MotorSpeed Preintegration
+add_library(MotorSpeedPreintegration src/motorSpeedPreintegration.cpp)
+add_dependencies(MotorSpeedPreintegration
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  ${PROJECT_NAME}_generate_messages_cpp
+  )
+target_link_libraries(MotorSpeedPreintegration
+  ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+  ${GTSAM_LIBRARIES}
+  gtsam
+  )
+
+# Transform Fusion
+add_library(TransformFusion src/transformFusion.cpp)
+add_dependencies(TransformFusion
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  )
+target_link_libraries(TransformFusion
+  ${catkin_LIBRARIES}
+  )

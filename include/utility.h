@@ -68,7 +68,7 @@ typedef pcl::PointXYZI PointType;
   void addNamespace(const std::string &ns, std::string &s) {
     const bool add_ns = s.rfind("/") != 0 && s.rfind(ns) != 0;
     if (add_ns)
-      s = ns + "/liosam/" + s;
+      s = ns + "/" + s;
   }
 /*//}*/
 

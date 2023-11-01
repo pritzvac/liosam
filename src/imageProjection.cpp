@@ -10,8 +10,9 @@ struct PointXYZIRT
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 } EIGEN_ALIGN16;
 
-POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT, (float, x, x)(float, y, y)(float, z, z)(float, intensity,
-                                                                                       intensity)(std::uint32_t, t, t)(std::uint8_t, ring, ring)(std::uint32_t, range, range))
+POINT_CLOUD_REGISTER_POINT_STRUCT(PointXYZIRT,
+                                  (float, x, x)(float, y, y)(float, z, z)(float, intensity, intensity)(std::uint32_t, t, t)(std::uint8_t, ring,
+                                                                                                                            ring)(std::uint32_t, range, range))
 
 namespace liosam
 {
@@ -20,8 +21,8 @@ namespace image_projection
 
 const int queueLength = 2000;
 
-/*//{ class ImageProjectionImpl() */
-class ImageProjectionImpl {
+/*//{ class ImageProjection() */
+class ImageProjection : public nodelet::Nodelet {
 private:
   std::mutex imuLock;
   std::mutex odoLock;
@@ -67,14 +68,9 @@ private:
   double                  timeScanEnd;
   std_msgs::Header        cloudHeader;
 
-/*//{ parameters */
+  /*//{ parameters */
 
   std::string uavName;
-
-  // Topics
-  string pointCloudTopic;
-  string imuTopic;
-  string odomTopic;
 
   // Frames
   std::string lidarFrame;
@@ -90,44 +86,40 @@ private:
   float  lidarMaxRange;
 
   // IMU
-  string             imuType;
+  bool useImu;
+  string imuType;
 
-/*//}*/
+  /*//}*/
 
   // IMU TF
   Eigen::Matrix3d    extRot;
   Eigen::Quaterniond extQRPY;
 
 public:
+  /*//{ onInit() */
+  virtual void onInit() {
 
-  /*//{ ImageProjectionImpl() */
-  ImageProjectionImpl(ros::NodeHandle &nh_) : deskewFlag(0) {
+    ROS_INFO("[ImageProjection]: initializing");
 
-/*//{ load parameters */
-    mrs_lib::ParamLoader pl(nh_, ros::this_node::getName());
+    deskewFlag = 0;
 
-    pl.loadParam("uav_name", uavName);
+    ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
-    pl.loadParam("imuType", imuType);
-    ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+    /*//{ load parameters */
+    mrs_lib::ParamLoader pl(nh, "ImageProjection");
 
-    pl.loadParam(imuType + "/imuTopic", imuTopic);
-    addNamespace("/" + uavName, imuTopic);
-    ROS_INFO("[%s]: loaded imuTopic: %s", ros::this_node::getName().c_str(), imuTopic.c_str());
+    pl.loadParam("uavName", uavName);
 
-    pl.loadParam("odomTopic", odomTopic);
-    addNamespace("/" + uavName, odomTopic);
-    ROS_INFO("[%s]: loaded odomTopic: %s", ros::this_node::getName().c_str(), odomTopic.c_str());
+    pl.loadParam("useImu", useImu);
+    if (useImu) {
+      pl.loadParam("imuType", imuType);
+      pl.loadParam(imuType + "/frame", imuFrame);
+      addNamespace(uavName, imuFrame);
+    }
 
-    pl.loadParam("pointCloudTopic", pointCloudTopic);
-    addNamespace("/" + uavName, pointCloudTopic);
-    ROS_INFO("[%s]: loaded pointCloudTopic: %s", ros::this_node::getName().c_str(), pointCloudTopic.c_str());
-
-    pl.loadParam("lidarFrame", lidarFrame, std::string("base_link"));
-    pl.loadParam(imuType + "/frame", imuFrame);
-    pl.loadParam("baselinkFrame", baselinkFrame, std::string("base_link"));
+    pl.loadParam("lidarFrame", lidarFrame);
+    pl.loadParam("baselinkFrame", baselinkFrame);
     addNamespace(uavName, lidarFrame);
-    addNamespace(uavName, imuFrame);
     addNamespace(uavName, baselinkFrame);
 
     pl.loadParam("numberOfRings", N_SCAN);
@@ -136,28 +128,32 @@ public:
     pl.loadParam("downsampleRate", downsampleRate, 1);
     pl.loadParam("lidarMinRange", lidarMinRange, 0.1f);
     pl.loadParam("lidarMaxRange", lidarMaxRange, 1000.0f);
-/*//}*/
 
+    if (!pl.loadedSuccessfully()) {
+      ROS_ERROR("[ImageProjection]: Could not load all parameters!");
+      ros::shutdown();
+    }
+
+    /*//}*/
+
+    if (useImu) {
     tf::StampedTransform tfLidar2Baselink, tfLidar2Imu;
-    findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+      findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
-    subImu = nh_.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImageProjectionImpl::imuHandler, this, ros::TransportHints().tcpNoDelay());
-    subOdom =
-        nh_.subscribe<nav_msgs::Odometry>(odomTopic + "_incremental", 2000, &ImageProjectionImpl::odometryHandler, this, ros::TransportHints().tcpNoDelay());
-    subLaserCloud = nh_.subscribe<sensor_msgs::PointCloud2>(pointCloudTopic, 5, &ImageProjectionImpl::cloudHandler, this, ros::TransportHints().tcpNoDelay());
+      subImu  = nh.subscribe<sensor_msgs::Imu>("imu_in", 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
+    }
+    subOdom = nh.subscribe<nav_msgs::Odometry>("odom_incremental_in", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+    subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 5, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
 
-    pubExtractedCloud = nh_.advertise<sensor_msgs::PointCloud2>("liosam/deskew/cloud_deskewed", 1);
-    pubLaserCloudInfo = nh_.advertise<liosam::cloud_info>("liosam/deskew/cloud_info", 1);
+    pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2>("liosam/deskew/deskewed_cloud_out", 1);
+    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/deskew/deskewed_cloud_info_out", 1);
 
     allocateMemory();
     resetParameters();
 
-    pcl::console::setVerbosityLevel(pcl::console::L_ERROR);
-  }
-  /*//}*/
+    /* pcl::console::setVerbosityLevel(pcl::console::L_ERROR); */
 
-  /*//{ ~ImageProjectionImpl() */
-  ~ImageProjectionImpl() {
+    ROS_INFO("\033[1;32m----> [Image Projection]: initialized.\033[0m");
   }
   /*//}*/
 
@@ -317,22 +313,24 @@ public:
 
   /*//{ deskewInfo() */
   bool deskewInfo() {
-    std::lock_guard<std::mutex> lock1(imuLock);
-    std::lock_guard<std::mutex> lock2(odoLock);
 
-    // make sure IMU data available for the scan
-    if (imuQueue.empty() || imuQueue.front().header.stamp.toSec() > timeScanCur || imuQueue.back().header.stamp.toSec() < timeScanEnd) {
-      if (imuQueue.empty()) {
-        ROS_WARN("Waiting for IMU data ... imu queue is empty");
-      } else if (imuQueue.front().header.stamp.toSec() > timeScanCur) {
-        ROS_WARN("Waiting for IMU data ... imu msg time (%0.2f) > time scan cur (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanCur);
-      } else if (imuQueue.back().header.stamp.toSec() < timeScanEnd) {
-        ROS_WARN("Waiting for IMU data ... imu msg time (%0.2f) < time scan end time (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanEnd);
+    if (useImu) {
+      std::lock_guard<std::mutex> lock1(imuLock);
+
+      // make sure IMU data available for the scan
+      if (imuQueue.empty() || imuQueue.front().header.stamp.toSec() > timeScanCur || imuQueue.back().header.stamp.toSec() < timeScanEnd) {
+        if (imuQueue.empty()) {
+          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu queue is empty");
+        } else if (imuQueue.front().header.stamp.toSec() > timeScanCur) {
+          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu msg time (%0.2f) > time scan cur (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanCur);
+        } else if (imuQueue.back().header.stamp.toSec() < timeScanEnd) {
+          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu msg time (%0.2f) < time scan end time (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanEnd);
+        }
+        return false;
       }
-      return false;
-    }
 
-    imuDeskewInfo();
+      imuDeskewInfo();
+    }
 
     odomDeskewInfo();
 
@@ -405,6 +403,7 @@ public:
 
   /*//{ odomDeskewInfo() */
   void odomDeskewInfo() {
+    std::lock_guard<std::mutex> lock2(odoLock);
     cloudInfo->odomAvailable = false;
 
     while (!odomQueue.empty()) {
@@ -452,43 +451,44 @@ public:
 
     cloudInfo->odomAvailable = true;
 
+    // petrlmat: The following code was commented out by me as it is not needed. Only position is extracted from the odometry to be later used in positional deskewing, which was commented out by the LIOSAM authors as it makes little difference.
     // get end odometry at the end of the scan
-    odomDeskewFlag = false;
+    /* odomDeskewFlag = false; */
 
-    if (odomQueue.back().header.stamp.toSec() < timeScanEnd) {
-      return;
-    }
+    /* if (odomQueue.back().header.stamp.toSec() < timeScanEnd) { */
+    /*   return; */
+    /* } */
 
-    nav_msgs::Odometry endOdomMsg;
+    /* nav_msgs::Odometry endOdomMsg; */
 
-    for (int i = 0; i < (int)odomQueue.size(); ++i) {
-      endOdomMsg = odomQueue[i];
+    /* for (int i = 0; i < (int)odomQueue.size(); ++i) { */
+    /*   endOdomMsg = odomQueue[i]; */
 
-      if (ROS_TIME(&endOdomMsg) < timeScanEnd) {
-        continue;
-      } else {
-        break;
-      }
-    }
+    /*   if (ROS_TIME(&endOdomMsg) < timeScanEnd) { */
+    /*     continue; */
+    /*   } else { */
+    /*     break; */
+    /*   } */
+    /* } */
 
-    if (int(round(startOdomMsg.pose.covariance[0])) != int(round(endOdomMsg.pose.covariance[0]))) {
-      return;
-    }
+    /* if (int(round(startOdomMsg.pose.covariance[0])) != int(round(endOdomMsg.pose.covariance[0]))) { */
+    /*   return; */
+    /* } */
 
-    const Eigen::Affine3f transBegin =
-        pcl::getTransformation(startOdomMsg.pose.pose.position.x, startOdomMsg.pose.pose.position.y, startOdomMsg.pose.pose.position.z, roll, pitch, yaw);
+    /* const Eigen::Affine3f transBegin = */
+    /*     pcl::getTransformation(startOdomMsg.pose.pose.position.x, startOdomMsg.pose.pose.position.y, startOdomMsg.pose.pose.position.z, roll, pitch, yaw); */
 
-    tf::quaternionMsgToTF(endOdomMsg.pose.pose.orientation, orientation);
-    tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
-    const Eigen::Affine3f transEnd =
-        pcl::getTransformation(endOdomMsg.pose.pose.position.x, endOdomMsg.pose.pose.position.y, endOdomMsg.pose.pose.position.z, roll, pitch, yaw);
+    /* tf::quaternionMsgToTF(endOdomMsg.pose.pose.orientation, orientation); */
+    /* tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw); */
+    /* const Eigen::Affine3f transEnd = */
+    /*     pcl::getTransformation(endOdomMsg.pose.pose.position.x, endOdomMsg.pose.pose.position.y, endOdomMsg.pose.pose.position.z, roll, pitch, yaw); */
 
-    const Eigen::Affine3f transBt = transBegin.inverse() * transEnd;
+    /* const Eigen::Affine3f transBt = transBegin.inverse() * transEnd; */
 
-    float rollIncre, pitchIncre, yawIncre;
-    pcl::getTranslationAndEulerAngles(transBt, odomIncreX, odomIncreY, odomIncreZ, rollIncre, pitchIncre, yawIncre);
+    /* float rollIncre, pitchIncre, yawIncre; */
+    /* pcl::getTranslationAndEulerAngles(transBt, odomIncreX, odomIncreY, odomIncreZ, rollIncre, pitchIncre, yawIncre); */
 
-    odomDeskewFlag = true;
+    /* odomDeskewFlag = true; */
   }
   /*//}*/
 
@@ -549,10 +549,10 @@ public:
     const double pointTime = timeScanCur + relTime;
 
     float rotXCur, rotYCur, rotZCur;
-    findRotation(pointTime, &rotXCur, &rotYCur, &rotZCur);
+    findRotation(pointTime, &rotXCur, &rotYCur, &rotZCur); // petrlmat: from imu only
 
     float posXCur, posYCur, posZCur;
-    findPosition(relTime, &posXCur, &posYCur, &posZCur);
+    findPosition(relTime, &posXCur, &posYCur, &posZCur); // petrlmat: not used, always zero position
 
     if (firstPointFlag == true) {
       transStartInverse = (pcl::getTransformation(posXCur, posYCur, posZCur, rotXCur, rotYCur, rotZCur)).inverse();
@@ -574,6 +574,7 @@ public:
   /*//}*/
 
   /*//{ projectPointCloud() */
+  // petrlmat: this functions only copies points from one point cloud to another (of another type) when deskewing is disabled (default so far) - potential performance gain if we get rid of the copy
   void projectPointCloud() {
     // range image projection
     const unsigned int cloudSize = laserCloudIn->points.size();
@@ -620,6 +621,7 @@ public:
         continue;
       }
 
+      // petrlmat: so far, we were using liosam without deskewing
       /* thisPoint = deskewPoint(&thisPoint, laserCloudIn->at(j, rowIdn).time); // Velodyne */
       /* thisPoint = deskewPoint(&thisPoint, (float)laserCloudIn->at(j, rowIdn).t / 1000000000.0);  // Ouster */
 
@@ -665,7 +667,7 @@ public:
       pubLaserCloudInfo.publish(cloudInfo);
     }
     catch (...) {
-      ROS_ERROR("[LioSam|IP]: Exception caught during publishing topic %s.", pubLaserCloudInfo.getTopic().c_str());
+      ROS_ERROR("[ImageProjection]: Exception caught during publishing topic %s.", pubLaserCloudInfo.getTopic().c_str());
     }
   }
   /*//}*/
@@ -699,23 +701,6 @@ public:
   /*//}*/
 };
 /*//}*/
-
-/* //{ class ImageProjection */
-
-class ImageProjection : public nodelet::Nodelet {
-
-public:
-  virtual void onInit() {
-    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    IP                  = std::make_unique<ImageProjectionImpl>(nh_);
-    ROS_INFO("\033[1;32m----> Image Projection Started.\033[0m");
-  };
-
-private:
-  std::shared_ptr<ImageProjectionImpl> IP;
-};
-
-//}
 
 }  // namespace image_projection
 }  // namespace liosam

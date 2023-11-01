@@ -230,7 +230,7 @@ public:
     /*//{ load parameters */
     mrs_lib::ParamLoader pl(nh_, ros::this_node::getName());
 
-    pl.loadParam("uav_name", uavName);
+    pl.loadParam("uavName", uavName);
 
     pl.loadParam("liosam/imuType", imuType);
     ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());

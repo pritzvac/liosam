@@ -71,17 +71,11 @@ public:
     ros::Time::waitForValid();
 
 /*//{ load params */
-    ROS_INFO("[FeatureExtraction]: 1");
     mrs_lib::ParamLoader pl(nh, "FeatureExtraction");
 
-    ROS_INFO("[FeatureExtraction]: 2");
     pl.loadParam("uavName", uavName);
 
-    ROS_INFO("[FeatureExtraction]: 3");
-
-    ROS_INFO("[FeatureExtraction]: 4");
     pl.loadParam("lidarFrame", lidarFrame);
-    ROS_INFO("[FeatureExtraction]: 5");
     addNamespace(uavName, lidarFrame);
 
     pl.loadParam("numberOfRings", N_SCAN);
@@ -98,16 +92,16 @@ public:
     }
 /*//}*/
 
-    subLaserCloudInfo = nh.subscribe<liosam::cloud_info>("liosam/deskew/cloud_info", 1, &FeatureExtraction::laserCloudInfoHandler, this,
+    subLaserCloudInfo = nh.subscribe<liosam::cloud_info>("liosam/feature/deskewed_cloud_info_in", 1, &FeatureExtraction::laserCloudInfoHandler, this,
                                                           ros::TransportHints().tcpNoDelay());
 
-    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/feature/cloud_info", 1);
-    pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner", 1);
-    pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface", 1);
+    pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/feature/cloud_info_out", 1);
+    pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner_out", 1);
+    pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface_out", 1);
 
     initializationValue();
 
-    ROS_INFO("\033[1;32m----> [FeatureExtraction] initialized.\033[0m");
+    ROS_INFO("\033[1;32m----> [FeatureExtraction]: initialized.\033[0m");
     is_initialized_ = true;
   }
 /*//}*/
