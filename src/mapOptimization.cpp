@@ -46,12 +46,11 @@ namespace liosam
 namespace map_optimization
 {
 
-/*//{ class MapOptimizationImpl() */
-class MapOptimizationImpl {
+/*//{ class MapOptimization() */
+class MapOptimization : public nodelet::Nodelet {
 
 public:
-
-/*//{ parameters */
+  /*//{ parameters */
 
   string uavName;
 
@@ -71,16 +70,16 @@ public:
   float poseCovThreshold;
 
   // LIDAR
-  int    N_SCAN;
-  int    Horizon_SCAN;
+  int N_SCAN;
+  int Horizon_SCAN;
 
   // IMU
-  string             imuType;
-  float              imuRPYWeight;
+  string imuType;
+  float  imuRPYWeight;
 
   // LOAM
-  int   edgeFeatureMinValidNum;
-  int   surfFeatureMinValidNum;
+  int edgeFeatureMinValidNum;
+  int surfFeatureMinValidNum;
 
   // Voxel filter
   float mappingCornerLeafSize;
@@ -117,10 +116,10 @@ public:
   // Save pcd
   bool   savePCD;
   string savePCDDirectory;
-/*//}*/
+  /*//}*/
 
   // TF
-  tf::StampedTransform  tfLidar2Baselink;
+  tf::StampedTransform tfLidar2Baselink;
 
   // IMU TF
   Eigen::Matrix3d    extRot;
@@ -223,78 +222,81 @@ public:
   Eigen::Affine3f incrementalOdometryAffineFront;
   Eigen::Affine3f incrementalOdometryAffineBack;
 
+  bool isInitialized = false;
+
+  ros::Timer timerVisualizeGlobalMap;
+  ros::Timer timerLoopClosure;
+
 public:
-  /*//{ MapOptimizationImpl() */
-  MapOptimizationImpl(ros::NodeHandle& nh_) {
+  /*//{ onInit() */
+  virtual void onInit() {
+
+    ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
     /*//{ load parameters */
-    mrs_lib::ParamLoader pl(nh_, ros::this_node::getName());
+    mrs_lib::ParamLoader pl(nh, "MapOptimization");
 
     pl.loadParam("uavName", uavName);
 
-    pl.loadParam("liosam/imuType", imuType);
-    ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+    pl.loadParam("imuType", imuType);
 
-    pl.loadParam("liosam/gpsTopic", gpsTopic, std::string("odometry/gps"));
-    addNamespace("/" + uavName, gpsTopic);
-
-    pl.loadParam("liosam/lidarFrame", lidarFrame, std::string("base_link"));
-    pl.loadParam("liosam/" + imuType + "/frame", imuFrame);
-    pl.loadParam("liosam/baselinkFrame", baselinkFrame, std::string("base_link"));
-    pl.loadParam("liosam/odometryFrame", odometryFrame, std::string("odom"));
+    pl.loadParam("lidarFrame", lidarFrame);
+    pl.loadParam(imuType + "/frame", imuFrame);
+    pl.loadParam("baselinkFrame", baselinkFrame);
+    pl.loadParam("odometryFrame", odometryFrame);
     addNamespace(uavName, lidarFrame);
     addNamespace(uavName, imuFrame);
     addNamespace(uavName, baselinkFrame);
     addNamespace(uavName, odometryFrame);
 
-    pl.loadParam("liosam/useImuHeadingInitialization", useImuHeadingInitialization, false);
-    pl.loadParam("liosam/useGpsElevation", useGpsElevation, false);
-    pl.loadParam("liosam/gpsCovThreshold", gpsCovThreshold, 2.0f);
-    pl.loadParam("liosam/poseCovThreshold", poseCovThreshold, 25.0f);
+    pl.loadParam("useImuHeadingInitialization", useImuHeadingInitialization, false);
+    pl.loadParam("useGpsElevation", useGpsElevation, false);
+    pl.loadParam("gpsCovThreshold", gpsCovThreshold, 2.0f);
+    pl.loadParam("poseCovThreshold", poseCovThreshold, 25.0f);
 
-    pl.loadParam("liosam/savePCD", savePCD, false);
-    pl.loadParam("liosam/savePCDDirectory", savePCDDirectory, std::string("/Downloads/LOAM/"));
+    pl.loadParam("savePCD", savePCD, false);
+    pl.loadParam("savePCDDirectory", savePCDDirectory, std::string("/Downloads/LOAM/"));
 
-    pl.loadParam("liosam/N_SCAN", N_SCAN);
-    pl.loadParam("liosam/Horizon_SCAN", Horizon_SCAN);
+    pl.loadParam("N_SCAN", N_SCAN);
+    pl.loadParam("Horizon_SCAN", Horizon_SCAN);
 
-    pl.loadParam("liosam/" + imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
+    pl.loadParam(imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
 
-    pl.loadParam("liosam/edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
-    pl.loadParam("liosam/surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
+    pl.loadParam("edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
+    pl.loadParam("surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
 
-    pl.loadParam("liosam/mappingCornerLeafSize", mappingCornerLeafSize, 0.2f);
-    pl.loadParam("liosam/mappingSurfLeafSize", mappingSurfLeafSize, 0.2f);
+    pl.loadParam("mappingCornerLeafSize", mappingCornerLeafSize, 0.2f);
+    pl.loadParam("mappingSurfLeafSize", mappingSurfLeafSize, 0.2f);
 
-    pl.loadParam("liosam/z_tollerance", z_tollerance, FLT_MAX);
-    pl.loadParam("liosam/rotation_tollerance", rotation_tollerance, FLT_MAX);
+    pl.loadParam("z_tollerance", z_tollerance, FLT_MAX);
+    pl.loadParam("rotation_tollerance", rotation_tollerance, FLT_MAX);
 
-    pl.loadParam("liosam/numberOfCores", numberOfCores, 4);
-    pl.loadParam("liosam/mappingProcessInterval", mappingProcessInterval, 0.15);
+    pl.loadParam("numberOfCores", numberOfCores, 4);
+    pl.loadParam("mappingProcessInterval", mappingProcessInterval, 0.15);
 
-    pl.loadParam("liosam/surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0f);
-    pl.loadParam("liosam/surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2f);
-    pl.loadParam("liosam/surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0f);
-    pl.loadParam("liosam/surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0f);
+    pl.loadParam("surroundingkeyframeAddingDistThreshold", surroundingkeyframeAddingDistThreshold, 1.0f);
+    pl.loadParam("surroundingkeyframeAddingAngleThreshold", surroundingkeyframeAddingAngleThreshold, 0.2f);
+    pl.loadParam("surroundingKeyframeDensity", surroundingKeyframeDensity, 1.0f);
+    pl.loadParam("surroundingKeyframeSearchRadius", surroundingKeyframeSearchRadius, 50.0f);
 
-    pl.loadParam("liosam/loopClosureEnableFlag", loopClosureEnableFlag, false);
-    pl.loadParam("liosam/loopClosureFrequency", loopClosureFrequency, 1.0f);
-    pl.loadParam("liosam/surroundingKeyframeSize", surroundingKeyframeSize, 50);
-    pl.loadParam("liosam/historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0f);
-    pl.loadParam("liosam/historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0f);
-    pl.loadParam("liosam/historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
-    pl.loadParam("liosam/historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3f);
+    pl.loadParam("loopClosureEnableFlag", loopClosureEnableFlag, false);
+    pl.loadParam("loopClosureFrequency", loopClosureFrequency, 1.0f);
+    pl.loadParam("surroundingKeyframeSize", surroundingKeyframeSize, 50);
+    pl.loadParam("historyKeyframeSearchRadius", historyKeyframeSearchRadius, 10.0f);
+    pl.loadParam("historyKeyframeSearchTimeDiff", historyKeyframeSearchTimeDiff, 30.0f);
+    pl.loadParam("historyKeyframeSearchNum", historyKeyframeSearchNum, 25);
+    pl.loadParam("historyKeyframeFitnessScore", historyKeyframeFitnessScore, 0.3f);
 
-    pl.loadParam("liosam/globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3f);
-    pl.loadParam("liosam/globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0f);
-    pl.loadParam("liosam/globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0f);
+    pl.loadParam("globalMapVisualizationSearchRadius", globalMapVisualizationSearchRadius, 1e3f);
+    pl.loadParam("globalMapVisualizationPoseDensity", globalMapVisualizationPoseDensity, 10.0f);
+    pl.loadParam("globalMapVisualizationLeafSize", globalMapVisualizationLeafSize, 1.0f);
 
     if (!pl.loadedSuccessfully()) {
-      ROS_ERROR("[mapOptimization]: Could not load all parameters!");
+      ROS_ERROR("[MapOptimization]: Could not load all parameters!");
       ros::shutdown();
     }
 
-/*//}*/
+    /*//}*/
 
     tf::StampedTransform tfLidar2Imu;
     findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
@@ -304,25 +306,28 @@ public:
     parameters.relinearizeSkip      = 1;
     isam                            = new ISAM2(parameters);
 
-    pubKeyPoses                 = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/trajectory", 1);
-    pubLaserCloudSurround       = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_global", 1);
-    pubLaserOdometryGlobal      = nh_.advertise<nav_msgs::Odometry>("liosam/mapping/odometry", 1);
-    pubLaserOdometryIncremental = nh_.advertise<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 1);
-    pubPath                     = nh_.advertise<nav_msgs::Path>("liosam/mapping/path", 1);
+    timerLoopClosure        = nh.createTimer(ros::Rate(loopClosureFrequency), &MapOptimization::callbackLoopClosureTimer, this);
+    timerVisualizeGlobalMap = nh.createTimer(ros::Rate(0.2), &MapOptimization::callbackVisualizeGlobalMapTimer, this);
 
-    subCloud = nh_.subscribe<liosam::cloud_info>("liosam/feature/cloud_info", 1, &MapOptimizationImpl::laserCloudInfoHandler, this,
-                                                 ros::TransportHints().tcpNoDelay());
-    subGPS   = nh_.subscribe<nav_msgs::Odometry>(gpsTopic, 200, &MapOptimizationImpl::gpsHandler, this, ros::TransportHints().tcpNoDelay());
-    subLoop  = nh_.subscribe<std_msgs::Float64MultiArray>("liosam/loop_closure_detection", 1, &MapOptimizationImpl::loopInfoHandler, this,
-                                                         ros::TransportHints().tcpNoDelay());
+    subCloud = nh.subscribe<liosam::cloud_info>("liosam/mapping/cloud_info_in", 1, &MapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+    subGPS  = nh.subscribe<nav_msgs::Odometry>("liosam/mapping/gps_in", 200, &MapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+    subLoop = nh.subscribe<std_msgs::Float64MultiArray>("liosam/loop_closure_detection_in", 1, &MapOptimization::loopInfoHandler, this,
+                                                        ros::TransportHints().tcpNoDelay());
 
-    pubHistoryKeyFrames   = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_history_cloud", 1);
-    pubIcpKeyFrames       = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_corrected_cloud", 1);
-    pubLoopConstraintEdge = nh_.advertise<visualization_msgs::MarkerArray>("liosam/mapping/loop_closure_constraints", 1);
+    pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/trajectory_out", 1);
+    pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_global_out", 1);
+    pubLaserOdometryGlobal      = nh.advertise<nav_msgs::Odometry>("liosam/mapping/odometry_out", 1);
+    pubLaserOdometryIncremental = nh.advertise<nav_msgs::Odometry>("liosam/mapping/odometry_incremental_out", 1);
+    pubPath                     = nh.advertise<nav_msgs::Path>("liosam/mapping/path_out", 1);
 
-    pubRecentKeyFrames    = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_local", 1);
-    pubRecentKeyFrame     = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered", 1);
-    pubCloudRegisteredRaw = nh_.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_raw", 1);
+
+    pubHistoryKeyFrames   = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_history_cloud_out", 1);
+    pubIcpKeyFrames       = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/icp_loop_closure_corrected_cloud_out", 1);
+    pubLoopConstraintEdge = nh.advertise<visualization_msgs::MarkerArray>("liosam/mapping/loop_closure_constraints_out", 1);
+
+    pubRecentKeyFrames    = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_local_out", 1);
+    pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_out", 1);
+    pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_raw_out", 1);
 
     downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
     downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
@@ -331,6 +336,9 @@ public:
                                                   surroundingKeyframeDensity);  // for surrounding key poses of scan-to-map optimization
 
     allocateMemory();
+
+    ROS_INFO("\033[1;32m----> [MapOptimization]: initialized.\033[0m");
+    isInitialized = true;
   }
   /*//}*/
 
@@ -396,28 +404,20 @@ public:
     if (timeLaserInfoCur - timeLastProcessing >= mappingProcessInterval) {
       timeLastProcessing = timeLaserInfoCur;
 
-      ROS_INFO("[MapOptimization]: updateInitialGuess()");
       updateInitialGuess();
 
-      ROS_INFO("[MapOptimization]: extractSurroundingKeyFrames()");
       extractSurroundingKeyFrames();
 
-      ROS_INFO("[MapOptimization]: downsampleCurrentScan()");
       downsampleCurrentScan();
 
-      ROS_INFO("[MapOptimization]: scan2MapOptimization()");
       scan2MapOptimization();
 
-      ROS_INFO("[MapOptimization]: saveKeyFramesAndFactor()");
       saveKeyFramesAndFactor();
 
-      ROS_INFO("[MapOptimization]: correctPoses()");
       correctPoses();
 
-      ROS_INFO("[MapOptimization]: publishOdometry()");
       publishOdometry();
 
-      ROS_INFO("[MapOptimization]: publishFrames()");
       publishFrames();
     }
   }
@@ -501,15 +501,16 @@ public:
   }
   /*//}*/
 
-  /*//{ visualizeGlobalMapThread() */
-  void visualizeGlobalMapThread() {
-    ros::Rate rate(0.2);
-    while (ros::ok()) {
-      rate.sleep();
-      publishGlobalMap();
+  /*//{ callbackVisualizeGlobalMapTimer() */
+  void callbackVisualizeGlobalMapTimer([[maybe_unused]] const ros::TimerEvent& event) {
+
+    if (!isInitialized) {
+      return;
     }
 
-    if (savePCD == false) {
+    publishGlobalMap();
+
+    if (!savePCD) {
       return;
     }
 
@@ -608,18 +609,19 @@ public:
   }
   /*//}*/
 
-  /*//{ loopClosureThread() */
-  void loopClosureThread() {
-    if (loopClosureEnableFlag == false) {
+  /*//{ callbackLoopClosureTimer() */
+  void callbackLoopClosureTimer([[maybe_unused]] const ros::TimerEvent& event) {
+
+    if (!isInitialized) {
       return;
     }
 
-    ros::Rate rate(loopClosureFrequency);
-    while (ros::ok()) {
-      rate.sleep();
-      performLoopClosure();
-      visualizeLoopClosure();
+    if (!loopClosureEnableFlag) {
+      return;
     }
+
+    performLoopClosure();
+    visualizeLoopClosure();
   }
   /*//}*/
 
@@ -960,14 +962,14 @@ public:
         return;
       }
     }
-    
+
     // this code section won't be reached if pre-integrated rotation is available
     // if available, use imu incremental estimation for pose guess (only rotation)
     // if not available, the pre-integrated rotation from above will be used
     // therefore, IMU orientation is not necessary here
     if (cloudInfo.imuAvailable) {
       const Eigen::Affine3f transBack  = pcl::getTransformation(0, 0, 0, cloudInfo.imuRollInit, cloudInfo.imuPitchInit, cloudInfo.imuYawInit);
-      const Eigen::Affine3f transIncre = lastImuTransformation.inverse() * transBack; // only place where lastImuTransformation is used
+      const Eigen::Affine3f transIncre = lastImuTransformation.inverse() * transBack;  // only place where lastImuTransformation is used
 
       const Eigen::Affine3f transTobe  = trans2Affine3f(transformTobeMapped);
       const Eigen::Affine3f transFinal = transTobe * transIncre;
@@ -1940,29 +1942,6 @@ public:
   /*//}*/
 };
 /*//}*/
-
-/* //{ class MapOptimization */
-
-class MapOptimization : public nodelet::Nodelet {
-
-public:
-  virtual void onInit() {
-    ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-    MO                  = std::make_unique<MapOptimizationImpl>(nh_);
-    ROS_INFO("\033[1;32m----> Map Optimization Started.\033[0m");
-
-    std::thread loopthread(&MapOptimizationImpl::loopClosureThread, MO);
-    std::thread visualizeMapThread(&MapOptimizationImpl::visualizeGlobalMapThread, MO);
-
-    loopthread.detach();
-    visualizeMapThread.detach();
-  };
-
-private:
-  std::shared_ptr<MapOptimizationImpl> MO;
-};
-
-//}
 
 }  // namespace map_optimization
 }  // namespace liosam

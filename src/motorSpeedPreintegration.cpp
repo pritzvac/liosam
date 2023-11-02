@@ -354,7 +354,7 @@ public:
 
         motorSpeedIntegratorOpt_->integrateMeasurement(
             gtsam::Vector4(thisMotorSpeeds->values[0], thisMotorSpeeds->values[1], thisMotorSpeeds->values[2], thisMotorSpeeds->values[3]), dt);
-        ROS_INFO("[MotorSpeedPreintegration]: motor speeds: %.2f %.2f %.2f %.2f dt: %.2f", thisMotorSpeeds->values[0], thisMotorSpeeds->values[1],
+        ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: motor speeds: %.2f %.2f %.2f %.2f dt: %.2f", thisMotorSpeeds->values[0], thisMotorSpeeds->values[1],
                  thisMotorSpeeds->values[2], thisMotorSpeeds->values[3], dt);
 
         lastMotorSpeedT_opt = imuTime;
@@ -385,11 +385,11 @@ public:
     graphValues.insert(V(key), propState_.v());
     graphValues.insert(W(key), propState_.w());
     graphValues.insert(B(key), prevBias_);
-    ROS_INFO("[MotorSpeedPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f ang_vel: %.2f %.2f %.2f",
+    ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f ang_vel: %.2f %.2f %.2f",
              propState_.pose().translation().x(), propState_.pose().translation().y(), propState_.pose().translation().z(), propState_.pose().rotation().roll(),
              propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(), propState_.linVelocity()[0], propState_.linVelocity()[1],
              propState_.linVelocity()[2], propState_.angVelocity()[0], propState_.angVelocity()[1], propState_.angVelocity()[2]);
-    ROS_INFO("[MotorSpeedPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0], prevBias_.linAcc()[1],
+    ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0], prevBias_.linAcc()[1],
              prevBias_.linAcc()[2], prevBias_.angAcc()[0], prevBias_.angAcc()[1], prevBias_.angAcc()[2]);
     // optimize
     optimizer.update(graphFactors, graphValues);

@@ -83,10 +83,10 @@ public:
 
     subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("odom_mapping_in", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
     subImuOdometry =
-        nh.subscribe<nav_msgs::Odometry>("odom_mapping_incremental_in", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        nh.subscribe<nav_msgs::Odometry>("odom_imu_incremental_in", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
 
-    pubImuOdometry = nh.advertise<nav_msgs::Odometry>("liosam/odom/imu", 2000);
-    pubImuPath     = nh.advertise<nav_msgs::Path>("liosam/imu/path", 1);
+    pubImuOdometry = nh.advertise<nav_msgs::Odometry>("fused_odometry_out", 2000);
+    pubImuPath     = nh.advertise<nav_msgs::Path>("fused_path_out", 1);
 
     ROS_INFO("\033[1;32m----> [TransformFusion]: initialized.\033[0m");
     is_initialized_ = true;
@@ -113,6 +113,8 @@ public:
       return;
     }
 
+    ROS_INFO_ONCE("[TransformFusion]: lidarOdometryCallback first callback");
+
     std::lock_guard<std::mutex> lock(mtx);
 
     lidarOdomAffine = odom2affine(*odomMsg);
@@ -127,6 +129,8 @@ public:
     if (!is_initialized_) {
       return;
     }
+
+    ROS_INFO_ONCE("[TransformFusion]: imuOdometryCallback first callback");
 
     // TODO: publish TFs correctly as `map -> odom -> fcu` (control has to handle this by continuously republishing the reference in map frame)
 
@@ -143,6 +147,7 @@ public:
     if (lidarOdomTime == -1) {
       return;
     }
+
     while (!imuOdomQueue.empty()) {
       if (imuOdomQueue.front().header.stamp.toSec() <= lidarOdomTime) {
         imuOdomQueue.pop_front();
@@ -150,6 +155,11 @@ public:
         break;
       }
     }
+
+    if (imuOdomQueue.empty()) {
+      return;
+    }
+
     const Eigen::Affine3f imuOdomAffineFront = odom2affine(imuOdomQueue.front());
     const Eigen::Affine3f imuOdomAffineBack  = odom2affine(imuOdomQueue.back());
     const Eigen::Affine3f imuOdomAffineIncre = imuOdomAffineFront.inverse() * imuOdomAffineBack;
