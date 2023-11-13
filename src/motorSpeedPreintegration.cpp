@@ -69,7 +69,9 @@ public:
   ros::Subscriber subOdometry;
   ros::Publisher  pubImuOdometry;
   ros::Publisher  pubLinAcc;
+  ros::Publisher  pubLinAccBias;
   ros::Publisher  pubAngAcc;
+  ros::Publisher  pubAngAccBias;
 
   bool systemInitialized = false;
 
@@ -167,6 +169,8 @@ public:
     pubImuOdometry = nh.advertise<nav_msgs::Odometry>("liosam/preintegration/odom_preintegrated_out", 10);
     pubLinAcc      = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_out", 10);
     pubAngAcc      = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_acc_out", 10);
+    pubLinAccBias  = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_bias_out", 10);
+    pubAngAccBias  = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_acc_bias_out", 10);
 
     boost::shared_ptr<gtsam::MotorSpeedParams> p = gtsam::MotorSpeedParams::MakeSharedU(gravity);
     p->setMass(mass + (float)numMotors * propMass);
@@ -235,6 +239,7 @@ public:
 
     // make sure we have imu data to integrate
     if (motorSpeedQueOpt.empty()) {
+      ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: no data to integrate");
       return;
     }
 
@@ -299,6 +304,7 @@ public:
 
       key               = 1;
       systemInitialized = true;
+      ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: initialized graph");
       return;
     }
 
@@ -355,7 +361,7 @@ public:
         motorSpeedIntegratorOpt_->integrateMeasurement(
             gtsam::Vector4(thisMotorSpeeds->values[0], thisMotorSpeeds->values[1], thisMotorSpeeds->values[2], thisMotorSpeeds->values[3]), dt);
         ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: motor speeds: %.2f %.2f %.2f %.2f dt: %.2f", thisMotorSpeeds->values[0], thisMotorSpeeds->values[1],
-                 thisMotorSpeeds->values[2], thisMotorSpeeds->values[3], dt);
+                          thisMotorSpeeds->values[2], thisMotorSpeeds->values[3], dt);
 
         lastMotorSpeedT_opt = imuTime;
         motorSpeedQueOpt.pop_front();
@@ -386,11 +392,12 @@ public:
     graphValues.insert(W(key), propState_.w());
     graphValues.insert(B(key), prevBias_);
     ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f ang_vel: %.2f %.2f %.2f",
-             propState_.pose().translation().x(), propState_.pose().translation().y(), propState_.pose().translation().z(), propState_.pose().rotation().roll(),
-             propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(), propState_.linVelocity()[0], propState_.linVelocity()[1],
-             propState_.linVelocity()[2], propState_.angVelocity()[0], propState_.angVelocity()[1], propState_.angVelocity()[2]);
-    ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0], prevBias_.linAcc()[1],
-             prevBias_.linAcc()[2], prevBias_.angAcc()[0], prevBias_.angAcc()[1], prevBias_.angAcc()[2]);
+                      propState_.pose().translation().x(), propState_.pose().translation().y(), propState_.pose().translation().z(),
+                      propState_.pose().rotation().roll(), propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(),
+                      propState_.linVelocity()[0], propState_.linVelocity()[1], propState_.linVelocity()[2], propState_.angVelocity()[0],
+                      propState_.angVelocity()[1], propState_.angVelocity()[2]);
+    ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0],
+                      prevBias_.linAcc()[1], prevBias_.linAcc()[2], prevBias_.angAcc()[0], prevBias_.angAcc()[1], prevBias_.angAcc()[2]);
     // optimize
     optimizer.update(graphFactors, graphValues);
     optimizer.update();
@@ -443,12 +450,21 @@ public:
     }
 
     geometry_msgs::Vector3Stamped lin_acc_msg;
+    gtsam::Vector3 lin_acc_w = prevPose_.rotation()*lin_acc_b;
     lin_acc_msg.header.stamp    = ros::Time::now();
     lin_acc_msg.header.frame_id = "fcu";
-    lin_acc_msg.vector.x        = lin_acc_b[0];
-    lin_acc_msg.vector.y        = lin_acc_b[1];
-    lin_acc_msg.vector.z        = lin_acc_b[2];
+    lin_acc_msg.vector.x        = lin_acc_w[0];
+    lin_acc_msg.vector.y        = lin_acc_w[1];
+    lin_acc_msg.vector.z        = lin_acc_w[2];
     pubLinAcc.publish(lin_acc_msg);
+
+    geometry_msgs::Vector3Stamped lin_acc_bias_msg;
+    lin_acc_bias_msg.header.stamp    = ros::Time::now();
+    lin_acc_bias_msg.header.frame_id = "fcu";
+    lin_acc_bias_msg.vector.x        = prevBias_.linAcc()[0];
+    lin_acc_bias_msg.vector.y        = prevBias_.linAcc()[1];
+    lin_acc_bias_msg.vector.z        = prevBias_.linAcc()[2];
+    pubLinAccBias.publish(lin_acc_bias_msg);
 
     geometry_msgs::Vector3Stamped ang_acc_msg;
     ang_acc_msg.header.stamp    = ros::Time::now();
@@ -457,6 +473,14 @@ public:
     ang_acc_msg.vector.y        = ang_acc_b[1];
     ang_acc_msg.vector.z        = ang_acc_b[2];
     pubAngAcc.publish(ang_acc_msg);
+
+    geometry_msgs::Vector3Stamped ang_acc_bias_msg;
+    ang_acc_bias_msg.header.stamp    = ros::Time::now();
+    ang_acc_bias_msg.header.frame_id = "fcu";
+    ang_acc_bias_msg.vector.x        = prevBias_.angAcc()[0];
+    ang_acc_bias_msg.vector.y        = prevBias_.angAcc()[1];
+    ang_acc_bias_msg.vector.z        = prevBias_.angAcc()[2];
+    pubAngAccBias.publish(ang_acc_bias_msg);
 
     ++key;
     doneFirstOpt = true;

@@ -77,7 +77,9 @@ namespace liosam
       ros::Subscriber subOdometry;
       ros::Publisher pubImuOdometry;
       ros::Publisher pubLinAcc;
+      ros::Publisher pubLinAccBias;
       ros::Publisher pubAngAcc;
+      ros::Publisher pubAngAccBias;
 
       bool systemInitialized = false;
 
@@ -173,7 +175,9 @@ namespace liosam
 
         pubImuOdometry = nh_.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 10);
         pubLinAcc = nh_.advertise<geometry_msgs::Vector3Stamped>("lin_acc", 10);
+        pubLinAccBias = nh_.advertise<geometry_msgs::Vector3Stamped>("lin_acc_bias", 10);
         pubAngAcc = nh_.advertise<geometry_msgs::Vector3Stamped>("ang_acc", 10);
+        pubAngAccBias = nh_.advertise<geometry_msgs::Vector3Stamped>("ang_acc_bias", 10);
 
         boost::shared_ptr<gtsam::MotorSpeedParams> p = gtsam::MotorSpeedParams::MakeSharedU(gravity);
         p->setMass(mass + numMotors * propMass);
@@ -468,6 +472,14 @@ namespace liosam
         lin_acc_msg.vector.z = lin_acc_b[2];
         pubLinAcc.publish(lin_acc_msg);
 
+        geometry_msgs::Vector3Stamped lin_acc_bias_msg;
+        lin_acc_bias_msg.header.stamp = ros::Time::now();
+        lin_acc_bias_msg.header.frame_id = "fcu";
+        lin_acc_bias_msg.vector.x = prevBias_.linAcc()[0];
+        lin_acc_bias_msg.vector.y = prevBias_.linAcc()[1];
+        lin_acc_bias_msg.vector.z = prevBias_.linAcc()[2];
+        pubLinAccBias.publish(lin_acc_bias_msg);
+
         geometry_msgs::Vector3Stamped ang_acc_msg;
         ang_acc_msg.header.stamp = ros::Time::now();
         ang_acc_msg.header.frame_id = "fcu";
@@ -475,6 +487,14 @@ namespace liosam
         ang_acc_msg.vector.y = ang_acc_b[1];
         ang_acc_msg.vector.z = ang_acc_b[2];
         pubAngAcc.publish(ang_acc_msg);
+
+        geometry_msgs::Vector3Stamped ang_acc_bias_msg;
+        ang_acc_bias_msg.header.stamp = ros::Time::now();
+        ang_acc_bias_msg.header.frame_id = "fcu";
+        ang_acc_bias_msg.vector.x = prevBias_.angAcc()[0];
+        ang_acc_bias_msg.vector.y = prevBias_.angAcc()[1];
+        ang_acc_bias_msg.vector.z = prevBias_.angAcc()[2];
+        pubAngAccBias.publish(ang_acc_bias_msg);
 
         ++key;
         doneFirstOpt = true;

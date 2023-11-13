@@ -198,6 +198,8 @@ public:
 
   float transformTobeMapped[6];
 
+  bool isFirstMapOptimizationSuccessful = false;
+
   std::mutex mtx;
   std::mutex mtxLoopInfo;
 
@@ -388,7 +390,12 @@ public:
 
   /*//{ laserCloudInfoHandler() */
   void laserCloudInfoHandler(const liosam::cloud_info::ConstPtr& msgIn) {
-    ROS_INFO_ONCE("[MapOptimization]: lasrCloudInfoHandler first callback");
+
+    if (!isInitialized) {
+      return;
+    }
+
+    ROS_INFO_ONCE("[MapOptimization]: laserCloudInfoHandler first callback");
     // extract time stamp
     timeLaserInfoStamp = msgIn->header.stamp;
     timeLaserInfoCur   = msgIn->header.stamp.toSec();
@@ -416,15 +423,27 @@ public:
 
       correctPoses();
 
+      if (!isFirstMapOptimizationSuccessful) {
+        ROS_WARN("[MapOptimization]: optimization was not successful");
+        return;
+      }
+
       publishOdometry();
 
       publishFrames();
+    } else {
+      ROS_WARN("[MapOptimization]: Skipped processing");
     }
   }
   /*//}*/
 
   /*//{ gpsHandler() */
   void gpsHandler(const nav_msgs::Odometry::ConstPtr& gpsMsg) {
+
+    if (!isInitialized) {
+      return;
+    }
+
     gpsQueue.push_back(*gpsMsg);
   }
   /*//}*/
@@ -627,6 +646,11 @@ public:
 
   /*//{ loopInfoHandler() */
   void loopInfoHandler(const std_msgs::Float64MultiArray::ConstPtr& loopMsg) {
+
+    if (!isInitialized) {
+      return;
+    }
+
     std::lock_guard<std::mutex> lock(mtxLoopInfo);
     if (loopMsg->data.size() != 2) {
       return;
@@ -1457,6 +1481,8 @@ public:
       }
 
       transformUpdate();
+      isFirstMapOptimizationSuccessful = true;
+
     } else {
       ROS_WARN("Not enough features! Only %d edge and %d planar features available.", laserCloudCornerLastDSNum, laserCloudSurfLastDSNum);
     }
@@ -1667,6 +1693,8 @@ public:
 
     cout << "****************************************************" << endl;
     gtSAMgraph.print("GTSAM Graph:\n");
+
+    cout << "nr_factors: " << gtSAMgraph.nrFactors() << endl;
 
     // update iSAM
     isam->update(gtSAMgraph, initialEstimate);
