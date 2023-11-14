@@ -260,8 +260,11 @@ public:
     }
 
     // convert cloud
-    currentCloudMsg = std::move(cloudQueue.front());
-    cloudQueue.pop_front();
+    // why front of queue? this causes always the oldest point cloud to be processed i.e. delay of 200 ms?
+    /* currentCloudMsg = std::move(cloudQueue.front()); */
+    /* cloudQueue.pop_front(); */
+    currentCloudMsg = std::move(cloudQueue.back());
+    cloudQueue.pop_back();
     pcl::fromROSMsg(currentCloudMsg, *laserCloudIn);
 
     // get timestamp
