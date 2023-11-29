@@ -96,6 +96,8 @@ public:
   gtsam::FullState                      prevState_;
   gtsam::motor_speed_bias::ConstantBias prevBias_;
 
+  gtsam::motor_speed_bias::ConstantBias initBias_;
+
   gtsam::FullState                      prevStateOdom;
   gtsam::motor_speed_bias::ConstantBias prevBiasOdom;
 
@@ -152,11 +154,23 @@ public:
     pl.loadParam("motor_speeds/linAccNoise", linAccNoise);
     pl.loadParam("motor_speeds/angAccNoise", angAccNoise);
 
+    double init_bias_acc_lin_x, init_bias_acc_lin_y, init_bias_acc_lin_z;
+    pl.loadParam("motor_speeds/initBias/linear/x", init_bias_acc_lin_x);
+    pl.loadParam("motor_speeds/initBias/linear/y", init_bias_acc_lin_y);
+    pl.loadParam("motor_speeds/initBias/linear/z", init_bias_acc_lin_z);
+
+    double init_bias_acc_ang_x, init_bias_acc_ang_y, init_bias_acc_ang_z;
+    pl.loadParam("motor_speeds/initBias/angular/x", init_bias_acc_ang_x);
+    pl.loadParam("motor_speeds/initBias/angular/y", init_bias_acc_ang_y);
+    pl.loadParam("motor_speeds/initBias/angular/z", init_bias_acc_ang_z);
+
     if (!pl.loadedSuccessfully()) {
       ROS_ERROR("[MotorSpeedPreintegration]: Could not load all parameters!");
       ros::shutdown();
     }
     /*//}*/
+
+      initBias_ = gtsam::motor_speed_bias::ConstantBias((gtsam::Vector3() << init_bias_acc_lin_x, init_bias_acc_lin_y, init_bias_acc_lin_z).finished(), (gtsam::Vector3() <<  init_bias_acc_ang_x, init_bias_acc_ang_y, init_bias_acc_ang_z).finished());
 
     tf::StampedTransform tfLidar2Baselink;
     findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
@@ -226,11 +240,14 @@ public:
   /*//}*/
 
   /*//{ odometryHandler() */
+  // callback of incremental odometry from mapping
   void odometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg) {
 
     if (!is_initialized_) {
       return;
     }
+
+    ros::Time t_start = ros::Time::now();
 
     ROS_INFO_ONCE("[MotorSpeedPreintegration]: odometryHandler first callback");
     std::lock_guard<std::mutex> lock(mtx);
@@ -284,15 +301,14 @@ public:
       graphFactors.add(priorAngVel);
 
       // initial bias
-      prevBias_ = gtsam::motor_speed_bias::ConstantBias();
-      const gtsam::PriorFactor<gtsam::motor_speed_bias::ConstantBias> priorBias(B(0), prevBias_, priorBiasNoise);
+      const gtsam::PriorFactor<gtsam::motor_speed_bias::ConstantBias> priorBias(B(0), initBias_, priorBiasNoise);
       graphFactors.add(priorBias);
 
       // add values
       graphValues.insert(X(0), prevPose_);
       graphValues.insert(V(0), prevLinVel_);
       graphValues.insert(W(0), prevAngVel_);
-      graphValues.insert(B(0), prevBias_);
+      graphValues.insert(B(0), initBias_);
 
       // optimize once
       optimizer.update(graphFactors, graphValues);
@@ -308,9 +324,9 @@ public:
       return;
     }
 
-
     // reset graph for speed
     if (key == 100) {
+      ROS_INFO("[MotorSpeedPreintegration]: resetting graph");
       // get updated noise before reset
       const gtsam::noiseModel::Gaussian::shared_ptr updatedPoseNoise   = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(X(key - 1)));
       const gtsam::noiseModel::Gaussian::shared_ptr updatedLinVelNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(V(key - 1)));
@@ -344,6 +360,9 @@ public:
     }
 
 
+    ros::Time t_reset = ros::Time::now();
+    bool is_motor_speed_integrated = false;
+
     // 1. integrate imu data and optimize
     while (!motorSpeedQueOpt.empty()) {
       // pop and integrate imu data that is between two optimizations
@@ -365,11 +384,21 @@ public:
 
         lastMotorSpeedT_opt = imuTime;
         motorSpeedQueOpt.pop_front();
+        is_motor_speed_integrated = true;
+
       } else {
         break;
       }
     }
-    // add imu factor to graph
+
+    if (!is_motor_speed_integrated) {
+      ROS_INFO("[MotorSpeedPreintegration]: No motor speeds were integrated. Skipping optimization.");
+      return;
+    }
+
+    ros::Time t_integrate = ros::Time::now();
+
+    // add motor speed factor to graph
     const gtsam::PreintegratedMotorSpeedMeasurements& preint_motor_speeds =
         dynamic_cast<const gtsam::PreintegratedMotorSpeedMeasurements&>(*motorSpeedIntegratorOpt_);
     const gtsam::MotorSpeedFactor motor_speed_factor(X(key - 1), V(key - 1), W(key - 1), X(key), V(key), W(key), B(key), preint_motor_speeds);
@@ -398,7 +427,10 @@ public:
                       propState_.angVelocity()[1], propState_.angVelocity()[2]);
     ROS_INFO_THROTTLE(1.0, "[MotorSpeedPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0],
                       prevBias_.linAcc()[1], prevBias_.linAcc()[2], prevBias_.angAcc()[0], prevBias_.angAcc()[1], prevBias_.angAcc()[2]);
+
     // optimize
+    /* cout << "****************************************************" << endl; */
+    /* graphFactors.print("[MotorSpeedPreintegration]: graph\n"); */
     optimizer.update(graphFactors, graphValues);
     optimizer.update();
     graphFactors.resize(0);
@@ -418,6 +450,7 @@ public:
       return;
     }
 
+    ros::Time t_optimization = ros::Time::now();
 
     // 2. after optiization, re-propagate imu odometry preintegration
     prevStateOdom = prevState_;
@@ -433,8 +466,10 @@ public:
       // reset bias use the newly optimized bias
       motorSpeedIntegratorPredict_->resetIntegration();
       // integrate imu message from the beginning of this optimization
+      ros::Time ms_stamp;
       for (int i = 0; i < (int)motorSpeedQueImu.size(); ++i) {
         mrs_msgs::Float64ArrayStamped* thisMotorSpeeds = &motorSpeedQueImu[i];
+        ms_stamp = thisMotorSpeeds->header.stamp;
         const double                   imuTime         = ROS_TIME(thisMotorSpeeds);
         const double                   dt              = (lastMotorSpeedQT < 0) ? (1.0 / 500.0) : (imuTime - lastMotorSpeedQT);
 
@@ -448,7 +483,7 @@ public:
         lastMotorSpeedQT = imuTime;
       }
 
-      ROS_INFO("[MotorSpeedPreintegration]: motor speed integration delay: %.4f", (ros::Time::now() - ms_stamp).toSec());
+      /* ROS_INFO("[MotorSpeedPreintegration]: motor speed integration delay: %.4f", (ros::Time::now() - ms_stamp).toSec()); */
 
         const gtsam::Vector3          lin_acc_b = motorSpeedIntegratorPredict_->lastAcc();
         const gtsam::Vector3          ang_acc_b = motorSpeedIntegratorPredict_->lastAlpha();
@@ -470,9 +505,6 @@ public:
         pubAngAcc.publish(ang_acc_msg);
 
     }
-
-    ros::Time t_repropagate = ros::Time::now();
-    /* ROS_INFO("[MotorSpeedPreintegration]: t_init: %.4f t_reset: %.4f t_integrate: %.4f t_optimization: %.4f t_repropagate: %.4f t_total: %.4f", (t_start-t_init).toSec(), (t_init - t_reset).toSec(), (t_reset - t_integrate).toSec(), (t_integrate - t_optimization).toSec(), (t_optimization - t_repropagate).toSec(), (t_start - t_repropagate).toSec()); */
 
     geometry_msgs::Vector3Stamped lin_acc_bias_msg;
     lin_acc_bias_msg.header.stamp    = ros::Time::now();
@@ -505,10 +537,10 @@ public:
 
     const Eigen::Vector3f bla(biasCur.linAcc().x(), biasCur.linAcc().y(), biasCur.linAcc().z());
     const Eigen::Vector3f baa(biasCur.angAcc().x(), biasCur.angAcc().y(), biasCur.angAcc().z());
-    if (bla.norm() > 1.0 || baa.norm() > 1.0) {
-      ROS_WARN("[MotorSpeedPreintegration]: Large bias, reset IMU-preintegration!");
-      return true;
-    }
+    /* if (bla.norm() > 1.0 || baa.norm() > 1.0) { */
+    /*   ROS_WARN("[MotorSpeedPreintegration]: Large bias, reset IMU-preintegration!"); */
+    /*   return true; */
+    /* } */
 
     return false;
   }

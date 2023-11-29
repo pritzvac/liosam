@@ -149,9 +149,13 @@ public:
   ros::Subscriber subCloud;
   ros::Subscriber subGPS;
   ros::Subscriber subLoop;
+  ros::Subscriber subOrientation;
 
   std::deque<nav_msgs::Odometry> gpsQueue;
   liosam::cloud_info             cloudInfo;
+
+  geometry_msgs::QuaternionStamped orientationMsg;
+  bool gotOrientation = false;
 
   vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;
   vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
@@ -315,6 +319,8 @@ public:
     subGPS  = nh.subscribe<nav_msgs::Odometry>("liosam/mapping/gps_in", 200, &MapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
     subLoop = nh.subscribe<std_msgs::Float64MultiArray>("liosam/loop_closure_detection_in", 1, &MapOptimization::loopInfoHandler, this,
                                                         ros::TransportHints().tcpNoDelay());
+    subOrientation = nh.subscribe<geometry_msgs::QuaternionStamped>("liosam/mapping/orientation_in", 1, &MapOptimization::orientationHandler, this,
+                                                        ros::TransportHints().tcpNoDelay());
 
     pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/trajectory_out", 1);
     pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_global_out", 1);
@@ -388,10 +394,30 @@ public:
   }
   /*//}*/
 
+  /*//{ orientationHandler() */
+  void orientationHandler(const geometry_msgs::QuaternionStamped::ConstPtr& msgIn) {
+
+    if (!isInitialized) {
+      return;
+    }
+
+    ROS_INFO_ONCE("[MapOptimization]: orientationHandler first callback");
+
+    orientationMsg = *msgIn;
+
+    gotOrientation = true;
+  }
+  /*//}*/
+
   /*//{ laserCloudInfoHandler() */
   void laserCloudInfoHandler(const liosam::cloud_info::ConstPtr& msgIn) {
 
     if (!isInitialized) {
+      return;
+    }
+
+    if (!gotOrientation) {
+      ROS_INFO_THROTTLE(1.0, "[MapOptimization]: waiting for orientation");
       return;
     }
 
@@ -1537,8 +1563,11 @@ public:
   /*//}*/
 
   /*//{ saveFrame() */
+  // this checks whether a keyframe should be added when large enough motion detected
   bool saveFrame() {
+    
     if (cloudKeyPoses3D->points.empty()) {
+      ROS_INFO("[MapOptimization]: cloudKeyPoses3D empty");
       return true;
     }
 
@@ -1551,6 +1580,7 @@ public:
 
     if (abs(roll) < surroundingkeyframeAddingAngleThreshold && abs(pitch) < surroundingkeyframeAddingAngleThreshold &&
         abs(yaw) < surroundingkeyframeAddingAngleThreshold && sqrt(x * x + y * y + z * z) < surroundingkeyframeAddingDistThreshold) {
+      /* ROS_INFO("[MapOptimization]: not enough motion, not adding keyframe"); */
       return false;
     }
 
@@ -1691,10 +1721,8 @@ public:
     // loop factor
     addLoopFactor();
 
-    cout << "****************************************************" << endl;
-    gtSAMgraph.print("GTSAM Graph:\n");
-
-    cout << "nr_factors: " << gtSAMgraph.nrFactors() << endl;
+    /* cout << "****************************************************" << endl; */
+    /* gtSAMgraph.print("[MapOptimization]: graph\n"); */
 
     // update iSAM
     isam->update(gtSAMgraph, initialEstimate);
@@ -1845,6 +1873,7 @@ public:
     laserOdometryROS->pose.pose.position.y   = T_odom.getOrigin().getY();
     laserOdometryROS->pose.pose.position.z   = T_odom.getOrigin().getZ();
     tf::quaternionTFToMsg(T_odom.getRotation(), laserOdometryROS->pose.pose.orientation);
+    /* laserOdometryROS->pose.pose.orientation   = orientationMsg.quaternion; */
     // ODOM: M -> FCU
     try {
       pubLaserOdometryGlobal.publish(laserOdometryROS);
@@ -1913,6 +1942,7 @@ public:
       laserOdomIncremental->pose.pose.position.y  = y;
       laserOdomIncremental->pose.pose.position.z  = z;
       laserOdomIncremental->pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+      /* laserOdomIncremental->pose.pose.orientation   = orientationMsg.quaternion; */
       if (isDegenerate) {
         laserOdomIncremental->pose.covariance[0] = 1;
       } else {

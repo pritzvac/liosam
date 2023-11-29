@@ -317,6 +317,7 @@ namespace liosam
         // reset graph for speed
         if (key == 100)
         {
+          ROS_INFO("[ImuPreintegration]: resetting graph");
           // get updated noise before reset
           const gtsam::noiseModel::Gaussian::shared_ptr updatedPoseNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(X(key - 1)));
           const gtsam::noiseModel::Gaussian::shared_ptr updatedLinVelNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(V(key - 1)));
@@ -409,6 +410,8 @@ namespace liosam
         ROS_INFO("[ImuPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0], prevBias_.linAcc()[1],
                  prevBias_.linAcc()[2], prevBias_.angAcc()[0], prevBias_.angAcc()[1], prevBias_.angAcc()[2]);
         // optimize
+        cout << "****************************************************" << endl;
+        graphFactors.print("[ImuPreintegration]: graph\n");
         optimizer.update(graphFactors, graphValues);
         optimizer.update();
         graphFactors.resize(0);

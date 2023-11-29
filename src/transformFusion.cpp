@@ -164,6 +164,7 @@ public:
     const Eigen::Affine3f imuOdomAffineBack  = odom2affine(imuOdomQueue.back());
     const Eigen::Affine3f imuOdomAffineIncre = imuOdomAffineFront.inverse() * imuOdomAffineBack;
     const Eigen::Affine3f imuOdomAffineLast  = lidarOdomAffine * imuOdomAffineIncre;
+    /* const Eigen::Affine3f imuOdomAffineLast  = lidarOdomAffine; */
     float                 x, y, z, roll, pitch, yaw;
     pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
 
