@@ -1,0 +1,13 @@
+imu:
+  frame_id: "base_link"
+  topic: "vio_imu/data"
+  gravity: 9.8
+  deskew: false # use imu to deskew cloud (requires 9-DOF IMU)
+  interpolateOrientation: # linear interpolation between scan matching result and IMU orientation (requires 9-DOF IMU)
+    enable: false
+    weight: 0.01
+  noise:
+    linAcc: 1.7391734436505606e+00
+    angVel: 1.7232641708847982e-01
+    linAccBias: 2.2595603813254508e-02
+    angVelBias: 1.0910192034708675e-03

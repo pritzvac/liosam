@@ -1,0 +1,13 @@
+imu:
+  frame_id: "fcu"
+  topic: "mavros/imu/data"
+  gravity: 9.8
+  deskew: false # use imu to deskew cloud (requires 9-DOF IMU)
+  interpolateOrientation: # linear interpolation between scan matching result and IMU orientation (requires 9-DOF IMU)
+    enable: false
+    weight: 0.01
+  noise:
+    linAcc: 0.006
+    angVel: 0.00018665
+    linAccBias: 0.006
+    angVelBias: 0.000038785

@@ -58,19 +58,13 @@ public:
 
     pl.loadParam("uavName", uavName);
 
-    pl.loadParam("imuType", imuType);
-    ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+    pl.loadParam("imu/frame_id", imuFrame);
+    addNamespace(uavName, imuFrame);
 
     pl.loadParam("lidarFrame", lidarFrame);
-    pl.loadParam(imuType + "/frame", imuFrame);
     pl.loadParam("baselinkFrame", baselinkFrame);
     pl.loadParam("odometryFrame", odometryFrame);
     pl.loadParam("mapFrame", mapFrame);
-    addNamespace(uavName, lidarFrame);
-    addNamespace(uavName, imuFrame);
-    addNamespace(uavName, baselinkFrame);
-    addNamespace(uavName, odometryFrame);
-    addNamespace(uavName, mapFrame);
 
     if (!pl.loadedSuccessfully()) {
       ROS_ERROR("[TransformFusion]: Could not load all parameters!");

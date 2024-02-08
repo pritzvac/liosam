@@ -39,7 +39,6 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   mrs_lib
   mrs_msgs
-  gtsam_playground
 )
 
 find_package(OpenMP REQUIRED)
@@ -77,7 +76,6 @@ catkin_package(
   visualization_msgs
   mrs_lib
   mrs_msgs
-  gtsam_playground
 )
 
 # add definitions
@@ -163,20 +161,6 @@ target_link_libraries(ImuPreintegration
   ${catkin_LIBRARIES}
   ${PCL_LIBRARIES}
   ${OpenCV_LIBRARIES}
-  ${Boost_LIBRARIES}
-  ${GTSAM_LIBRARIES}
-  gtsam
-  )
-
-# MotorSpeed Preintegration
-add_library(MotorSpeedPreintegration src/motorSpeedPreintegration.cpp)
-add_dependencies(MotorSpeedPreintegration
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  ${PROJECT_NAME}_generate_messages_cpp
-  )
-target_link_libraries(MotorSpeedPreintegration
-  ${catkin_LIBRARIES}
   ${Boost_LIBRARIES}
   ${GTSAM_LIBRARIES}
   gtsam

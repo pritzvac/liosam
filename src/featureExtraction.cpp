@@ -29,10 +29,6 @@ public:
   // Frames
   std::string lidarFrame;
 
-  // LIDAR
-  int    N_SCAN;
-  int    Horizon_SCAN;
-
   // LOAM
   float edgeThreshold;
   float surfThreshold;
@@ -42,6 +38,7 @@ public:
 /*//}*/
 
   ros::Subscriber subLaserCloudInfo;
+  ros::Subscriber subOrigCloudInfo;
 
   ros::Publisher pubLaserCloudInfo;
   ros::Publisher pubCornerPoints;
@@ -57,6 +54,10 @@ public:
   float *                   cloudCurvature;
   int *                     cloudNeighborPicked;
   int *                     cloudLabel;
+
+  bool isCloudInitialized = false;
+  int scanHeight;
+  int scanWidth;
 
   bool is_initialized_ = false;
 
@@ -78,9 +79,6 @@ public:
     pl.loadParam("lidarFrame", lidarFrame);
     addNamespace(uavName, lidarFrame);
 
-    pl.loadParam("numberOfRings", N_SCAN);
-    pl.loadParam("samplesPerRing", Horizon_SCAN);
-
     pl.loadParam("odometrySurfLeafSize", odometrySurfLeafSize, 0.2f);
 
     pl.loadParam("edgeThreshold", edgeThreshold, 0.1f);
@@ -94,12 +92,12 @@ public:
 
     subLaserCloudInfo = nh.subscribe<liosam::cloud_info>("liosam/feature/deskewed_cloud_info_in", 1, &FeatureExtraction::laserCloudInfoHandler, this,
                                                           ros::TransportHints().tcpNoDelay());
+    subOrigCloudInfo = nh.subscribe<sensor_msgs::PointCloud2>("liosam/feature/orig_cloud_info_in", 1, &FeatureExtraction::origCloudInfoHandler, this,
+                                                          ros::TransportHints().tcpNoDelay());
 
     pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/feature/cloud_info_out", 1);
     pubCornerPoints   = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_corner_out", 1);
     pubSurfacePoints  = nh.advertise<sensor_msgs::PointCloud2>("liosam/feature/cloud_surface_out", 1);
-
-    initializationValue();
 
     ROS_INFO("\033[1;32m----> [FeatureExtraction]: initialized.\033[0m");
     is_initialized_ = true;
@@ -109,7 +107,7 @@ public:
   /*//{ initializationValue() */
   void initializationValue() {
     ROS_INFO("[FeatureExtraction]: initializationValue start");
-    cloudSmoothness.resize(N_SCAN * Horizon_SCAN);
+    cloudSmoothness.resize(scanHeight * scanWidth);
 
     downSizeFilter.setLeafSize(odometrySurfLeafSize, odometrySurfLeafSize, odometrySurfLeafSize);
 
@@ -117,9 +115,9 @@ public:
     cornerCloud.reset(new pcl::PointCloud<PointType>());
     surfaceCloud.reset(new pcl::PointCloud<PointType>());
 
-    cloudCurvature      = new float[N_SCAN * Horizon_SCAN];
-    cloudNeighborPicked = new int[N_SCAN * Horizon_SCAN];
-    cloudLabel          = new int[N_SCAN * Horizon_SCAN];
+    cloudCurvature      = new float[scanHeight * scanWidth];
+    cloudNeighborPicked = new int[scanHeight * scanWidth];
+    cloudLabel          = new int[scanHeight * scanWidth];
     ROS_INFO("[FeatureExtraction]: initializationValue end");
   }
   /*//}*/
@@ -132,6 +130,11 @@ public:
     }
 
     ROS_INFO_ONCE("[FeatureExtraction]: laserCloudInfoHandler first callback");
+
+    if (!isCloudInitialized) {
+      return;
+    }
+
     pcl::fromROSMsg(msgIn->cloud_deskewed, *extractedCloud);  // new cloud for extraction
 
     calculateSmoothness(msgIn);
@@ -141,6 +144,27 @@ public:
     extractFeatures(msgIn);
 
     publishFeatureCloud(msgIn);
+  }
+  /*//}*/
+
+  /*//{ origCloudInfoHandler() */
+  void origCloudInfoHandler(const sensor_msgs::PointCloud2::ConstPtr &msgIn) {
+
+    if (!is_initialized_) {
+      return;
+    }
+
+    ROS_INFO_ONCE("[FeatureExtraction]: origCloudInfoHandler first callback");
+
+    if (!isCloudInitialized) {
+      scanHeight = msgIn->height;
+      scanWidth  = msgIn->width;
+      initializationValue();
+      isCloudInitialized = true;
+      subOrigCloudInfo.shutdown();
+      ROS_INFO("[FeatureExtraction]: First scan height: %d width: %d", scanHeight, scanWidth);
+    }
+
   }
   /*//}*/
 
@@ -210,7 +234,7 @@ public:
     pcl::PointCloud<PointType>::Ptr surfaceCloudScan(new pcl::PointCloud<PointType>());
     pcl::PointCloud<PointType>::Ptr surfaceCloudScanDS(new pcl::PointCloud<PointType>());
 
-    for (int i = 0; i < N_SCAN; i++) {
+    for (int i = 0; i < scanHeight; i++) {
       surfaceCloudScan->clear();
 
       for (int j = 0; j < 6; j++) {
@@ -295,6 +319,7 @@ public:
 
       *surfaceCloud += *surfaceCloudScanDS;
     }
+      ROS_INFO_THROTTLE(1.0, "[FeatureExtraction]: rings: %d points: %lu corners: %lu surf: %lu", scanHeight, extractedCloud->points.size(), cornerCloud->size(), surfaceCloud->size());
   }
   /*//}*/
 

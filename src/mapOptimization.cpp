@@ -69,12 +69,8 @@ public:
   float gpsCovThreshold;
   float poseCovThreshold;
 
-  // LIDAR
-  int N_SCAN;
-  int Horizon_SCAN;
-
   // IMU
-  string imuType;
+  bool   imuRPYInterpolate;
   float  imuRPYWeight;
 
   // LOAM
@@ -147,6 +143,7 @@ public:
   ros::Publisher pubLoopConstraintEdge;
 
   ros::Subscriber subCloud;
+  ros::Subscriber subOrigCloudInfo;
   ros::Subscriber subGPS;
   ros::Subscriber subLoop;
   ros::Subscriber subOrientation;
@@ -155,7 +152,11 @@ public:
   liosam::cloud_info             cloudInfo;
 
   geometry_msgs::QuaternionStamped orientationMsg;
-  bool gotOrientation = false;
+  bool                             gotOrientation = false;
+
+  bool isMemoryAllocated = false;
+  int scanHeight;
+  int scanWidth;
 
   vector<pcl::PointCloud<PointType>::Ptr> cornerCloudKeyFrames;
   vector<pcl::PointCloud<PointType>::Ptr> surfCloudKeyFrames;
@@ -244,16 +245,12 @@ public:
 
     pl.loadParam("uavName", uavName);
 
-    pl.loadParam("imuType", imuType);
+    pl.loadParam("imu/frame_id", imuFrame);
+    addNamespace(uavName, imuFrame);
 
     pl.loadParam("lidarFrame", lidarFrame);
-    pl.loadParam(imuType + "/frame", imuFrame);
     pl.loadParam("baselinkFrame", baselinkFrame);
     pl.loadParam("odometryFrame", odometryFrame);
-    addNamespace(uavName, lidarFrame);
-    addNamespace(uavName, imuFrame);
-    addNamespace(uavName, baselinkFrame);
-    addNamespace(uavName, odometryFrame);
 
     pl.loadParam("useImuHeadingInitialization", useImuHeadingInitialization, false);
     pl.loadParam("useGpsElevation", useGpsElevation, false);
@@ -263,10 +260,8 @@ public:
     pl.loadParam("savePCD", savePCD, false);
     pl.loadParam("savePCDDirectory", savePCDDirectory, std::string("/Downloads/LOAM/"));
 
-    pl.loadParam("N_SCAN", N_SCAN);
-    pl.loadParam("Horizon_SCAN", Horizon_SCAN);
-
-    pl.loadParam(imuType + "/imuRPYWeight", imuRPYWeight, 0.01f);
+    pl.loadParam("imu/interpolateOrientation/enable", imuRPYInterpolate, false);
+    pl.loadParam("imu/interpolateOrientation/weight", imuRPYWeight, 0.01f);
 
     pl.loadParam("edgeFeatureMinValidNum", edgeFeatureMinValidNum, 10);
     pl.loadParam("surfFeatureMinValidNum", surfFeatureMinValidNum, 100);
@@ -315,12 +310,14 @@ public:
     timerLoopClosure        = nh.createTimer(ros::Rate(loopClosureFrequency), &MapOptimization::callbackLoopClosureTimer, this);
     timerVisualizeGlobalMap = nh.createTimer(ros::Rate(0.2), &MapOptimization::callbackVisualizeGlobalMapTimer, this);
 
-    subCloud = nh.subscribe<liosam::cloud_info>("liosam/mapping/cloud_info_in", 1, &MapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
-    subGPS  = nh.subscribe<nav_msgs::Odometry>("liosam/mapping/gps_in", 200, &MapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
-    subLoop = nh.subscribe<std_msgs::Float64MultiArray>("liosam/loop_closure_detection_in", 1, &MapOptimization::loopInfoHandler, this,
+    subCloud =
+        nh.subscribe<liosam::cloud_info>("liosam/mapping/cloud_info_in", 1, &MapOptimization::laserCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+    subOrigCloudInfo = nh.subscribe<sensor_msgs::PointCloud2>("liosam/mapping/orig_cloud_info_in", 1, &MapOptimization::origCloudInfoHandler, this, ros::TransportHints().tcpNoDelay());
+    subGPS         = nh.subscribe<nav_msgs::Odometry>("liosam/mapping/gps_in", 200, &MapOptimization::gpsHandler, this, ros::TransportHints().tcpNoDelay());
+    subLoop        = nh.subscribe<std_msgs::Float64MultiArray>("liosam/mapping/loop_closure_detection_in", 1, &MapOptimization::loopInfoHandler, this,
                                                         ros::TransportHints().tcpNoDelay());
     subOrientation = nh.subscribe<geometry_msgs::QuaternionStamped>("liosam/mapping/orientation_in", 1, &MapOptimization::orientationHandler, this,
-                                                        ros::TransportHints().tcpNoDelay());
+                                                                    ros::TransportHints().tcpNoDelay());
 
     pubKeyPoses                 = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/trajectory_out", 1);
     pubLaserCloudSurround       = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/map_global_out", 1);
@@ -342,8 +339,6 @@ public:
     downSizeFilterICP.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
     downSizeFilterSurroundingKeyPoses.setLeafSize(surroundingKeyframeDensity, surroundingKeyframeDensity,
                                                   surroundingKeyframeDensity);  // for surrounding key poses of scan-to-map optimization
-
-    allocateMemory();
 
     ROS_INFO("\033[1;32m----> [MapOptimization]: initialized.\033[0m");
     isInitialized = true;
@@ -368,12 +363,12 @@ public:
     laserCloudOri.reset(new pcl::PointCloud<PointType>());
     coeffSel.reset(new pcl::PointCloud<PointType>());
 
-    laserCloudOriCornerVec.resize(N_SCAN * Horizon_SCAN);
-    coeffSelCornerVec.resize(N_SCAN * Horizon_SCAN);
-    laserCloudOriCornerFlag.resize(N_SCAN * Horizon_SCAN);
-    laserCloudOriSurfVec.resize(N_SCAN * Horizon_SCAN);
-    coeffSelSurfVec.resize(N_SCAN * Horizon_SCAN);
-    laserCloudOriSurfFlag.resize(N_SCAN * Horizon_SCAN);
+    laserCloudOriCornerVec.resize(scanHeight * scanWidth);
+    coeffSelCornerVec.resize(scanHeight * scanWidth);
+    laserCloudOriCornerFlag.resize(scanHeight * scanWidth);
+    laserCloudOriSurfVec.resize(scanHeight * scanWidth);
+    coeffSelSurfVec.resize(scanHeight * scanWidth);
+    laserCloudOriSurfFlag.resize(scanHeight * scanWidth);
 
     std::fill(laserCloudOriCornerFlag.begin(), laserCloudOriCornerFlag.end(), false);
     std::fill(laserCloudOriSurfFlag.begin(), laserCloudOriSurfFlag.end(), false);
@@ -422,6 +417,11 @@ public:
     }
 
     ROS_INFO_ONCE("[MapOptimization]: laserCloudInfoHandler first callback");
+
+    if (!isMemoryAllocated) {
+      return;
+    }
+
     // extract time stamp
     timeLaserInfoStamp = msgIn->header.stamp;
     timeLaserInfoCur   = msgIn->header.stamp.toSec();
@@ -433,36 +433,49 @@ public:
 
     std::lock_guard<std::mutex> lock(mtx);
 
-    static double timeLastProcessing = -1;
-    if (timeLaserInfoCur - timeLastProcessing >= mappingProcessInterval) {
-      timeLastProcessing = timeLaserInfoCur;
+    updateInitialGuess();
 
-      updateInitialGuess();
+    extractSurroundingKeyFrames();
 
-      extractSurroundingKeyFrames();
+    downsampleCurrentScan();
 
-      downsampleCurrentScan();
+    scan2MapOptimization();
 
-      scan2MapOptimization();
+    saveKeyFramesAndFactor();
 
-      saveKeyFramesAndFactor();
+    correctPoses();
 
-      correctPoses();
-
-      if (!isFirstMapOptimizationSuccessful) {
-        ROS_WARN("[MapOptimization]: optimization was not successful");
-        return;
-      }
-
-      publishOdometry();
-
-      publishFrames();
-    } else {
-      ROS_WARN("[MapOptimization]: Skipped processing");
+    if (!isFirstMapOptimizationSuccessful) {
+      ROS_WARN("[MapOptimization]: optimization was not successful");
+      return;
     }
+
+    publishOdometry();
+
+    publishFrames();
   }
   /*//}*/
 
+  /*//{ origCloudInfoHandler() */
+  void origCloudInfoHandler(const sensor_msgs::PointCloud2::ConstPtr &msgIn) {
+
+    if (!isInitialized) {
+      return;
+    }
+
+    ROS_INFO_ONCE("[MapOptimization]: origCloudInfoHandler first callback");
+
+    if (!isMemoryAllocated) {
+      scanHeight = msgIn->height;
+      scanWidth  = msgIn->width;
+      allocateMemory();
+      isMemoryAllocated = true;
+      ROS_INFO("[MapOptimization]: First scan height: %d width: %d", scanHeight, scanWidth);
+      subOrigCloudInfo.shutdown();
+    }
+
+  }
+  /*//}*/
   /*//{ gpsHandler() */
   void gpsHandler(const nav_msgs::Odometry::ConstPtr& gpsMsg) {
 
@@ -1506,7 +1519,9 @@ public:
         }
       }
 
-      transformUpdate();
+      if (imuRPYInterpolate) {
+        transformUpdate();
+      }
       isFirstMapOptimizationSuccessful = true;
 
     } else {
@@ -1541,10 +1556,6 @@ public:
       }
     }
 
-    transformTobeMapped[0] = constraintTransformation(transformTobeMapped[0], rotation_tollerance);
-    transformTobeMapped[1] = constraintTransformation(transformTobeMapped[1], rotation_tollerance);
-    transformTobeMapped[5] = constraintTransformation(transformTobeMapped[5], z_tollerance);
-
     incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
   }
   /*//}*/
@@ -1565,7 +1576,7 @@ public:
   /*//{ saveFrame() */
   // this checks whether a keyframe should be added when large enough motion detected
   bool saveFrame() {
-    
+
     if (cloudKeyPoses3D->points.empty()) {
       ROS_INFO("[MapOptimization]: cloudKeyPoses3D empty");
       return true;

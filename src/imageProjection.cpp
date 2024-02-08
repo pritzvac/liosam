@@ -32,6 +32,7 @@ private:
 
   ros::Publisher pubExtractedCloud;
   ros::Publisher pubLaserCloudInfo;
+  ros::Publisher pubOrigCloudInfo;
 
   ros::Subscriber              subImu;
   std::deque<sensor_msgs::Imu> imuQueue;
@@ -68,6 +69,10 @@ private:
   double                  timeScanEnd;
   std_msgs::Header        cloudHeader;
 
+  bool isMemoryAllocated = false;
+  int  scanHeight;
+  int  scanWidth;
+
   /*//{ parameters */
 
   std::string uavName;
@@ -78,15 +83,13 @@ private:
   std::string baselinkFrame;
 
   // LIDAR
-  int    N_SCAN;
-  int    Horizon_SCAN;
   string timeField;
   int    downsampleRate;
   float  lidarMinRange;
   float  lidarMaxRange;
 
   // IMU
-  bool useImu;
+  bool   imuDeskew;
   string imuType;
 
   /*//}*/
@@ -110,20 +113,17 @@ public:
 
     pl.loadParam("uavName", uavName);
 
-    pl.loadParam("useImu", useImu);
-    if (useImu) {
-      pl.loadParam("imuType", imuType);
-      pl.loadParam(imuType + "/frame", imuFrame);
+    pl.loadParam("imu/deskew", imuDeskew);
+    if (imuDeskew) {
+      pl.loadParam("imu/frame_id", imuFrame);
       addNamespace(uavName, imuFrame);
     }
 
     pl.loadParam("lidarFrame", lidarFrame);
-    pl.loadParam("baselinkFrame", baselinkFrame);
     addNamespace(uavName, lidarFrame);
+    pl.loadParam("baselinkFrame", baselinkFrame);
     addNamespace(uavName, baselinkFrame);
 
-    pl.loadParam("numberOfRings", N_SCAN);
-    pl.loadParam("samplesPerRing", Horizon_SCAN);
     pl.loadParam("timeField", timeField, std::string("t"));
     pl.loadParam("downsampleRate", downsampleRate, 1);
     pl.loadParam("lidarMinRange", lidarMinRange, 0.1f);
@@ -136,20 +136,18 @@ public:
 
     /*//}*/
 
-    if (useImu) {
-    tf::StampedTransform tfLidar2Baselink, tfLidar2Imu;
+    if (imuDeskew) {
+      tf::StampedTransform tfLidar2Baselink, tfLidar2Imu;
       findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
-      subImu  = nh.subscribe<sensor_msgs::Imu>("imu_in", 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
+      subImu = nh.subscribe<sensor_msgs::Imu>("imu_in", 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
     }
-    subOdom = nh.subscribe<nav_msgs::Odometry>("odom_incremental_in", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
+    subOdom       = nh.subscribe<nav_msgs::Odometry>("odom_incremental_in", 2000, &ImageProjection::odometryHandler, this, ros::TransportHints().tcpNoDelay());
     subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("cloud_in", 5, &ImageProjection::cloudHandler, this, ros::TransportHints().tcpNoDelay());
 
     pubExtractedCloud = nh.advertise<sensor_msgs::PointCloud2>("liosam/deskew/deskewed_cloud_out", 1);
     pubLaserCloudInfo = nh.advertise<liosam::cloud_info>("liosam/deskew/deskewed_cloud_info_out", 1);
-
-    allocateMemory();
-    resetParameters();
+    pubOrigCloudInfo = nh.advertise<sensor_msgs::PointCloud2>("liosam/deskew/orig_cloud_info_out", 1);
 
     /* pcl::console::setVerbosityLevel(pcl::console::L_ERROR); */
 
@@ -163,13 +161,13 @@ public:
     fullCloud.reset(new pcl::PointCloud<PointType>());
     extractedCloud.reset(new pcl::PointCloud<PointType>());
 
-    fullCloud->points.resize(N_SCAN * Horizon_SCAN);
+    fullCloud->points.resize(scanHeight * scanWidth);
 
-    cloudInfo->startRingIndex.assign(N_SCAN, 0);
-    cloudInfo->endRingIndex.assign(N_SCAN, 0);
+    cloudInfo->startRingIndex.assign(scanHeight, 0);
+    cloudInfo->endRingIndex.assign(scanHeight, 0);
 
-    cloudInfo->pointColInd.assign(N_SCAN * Horizon_SCAN, 0);
-    cloudInfo->pointRange.assign(N_SCAN * Horizon_SCAN, 0);
+    cloudInfo->pointColInd.assign(scanHeight * scanWidth, 0);
+    cloudInfo->pointRange.assign(scanHeight * scanWidth, 0);
 
     resetParameters();
   }
@@ -180,7 +178,7 @@ public:
     laserCloudIn->clear();
     extractedCloud->clear();
     // reset range matrix for range image projection
-    rangeMat = cv::Mat(N_SCAN, Horizon_SCAN, CV_32F, cv::Scalar::all(FLT_MAX));
+    rangeMat = cv::Mat(scanHeight, scanWidth, CV_32F, cv::Scalar::all(FLT_MAX));
 
     imuPointerCur  = 0;
     firstPointFlag = true;
@@ -233,6 +231,15 @@ public:
   void cloudHandler(const sensor_msgs::PointCloud2::ConstPtr &laserCloudMsg) {
 
     ROS_INFO_ONCE("[ImageProjection]: cloudHandler first callback");
+
+    if (!isMemoryAllocated) {
+      scanHeight = laserCloudMsg->height;
+      scanWidth  = laserCloudMsg->width;
+      allocateMemory();
+      isMemoryAllocated = true;
+      ROS_INFO("[ImageProjection]: First scan height: %d width: %d", scanHeight, scanWidth);
+    }
+
     if (!cachePointCloud(laserCloudMsg)) {
       return;
     }
@@ -317,7 +324,7 @@ public:
   /*//{ deskewInfo() */
   bool deskewInfo() {
 
-    if (useImu) {
+    if (imuDeskew) {
       std::lock_guard<std::mutex> lock1(imuLock);
 
       // make sure IMU data available for the scan
@@ -325,9 +332,11 @@ public:
         if (imuQueue.empty()) {
           ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu queue is empty");
         } else if (imuQueue.front().header.stamp.toSec() > timeScanCur) {
-          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu msg time (%0.2f) > time scan cur (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanCur);
+          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu msg time (%0.2f) > time scan cur (%0.2f)", imuQueue.back().header.stamp.toSec(),
+                   timeScanCur);
         } else if (imuQueue.back().header.stamp.toSec() < timeScanEnd) {
-          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu msg time (%0.2f) < time scan end time (%0.2f)", imuQueue.back().header.stamp.toSec(), timeScanEnd);
+          ROS_WARN("[ImageProjection]: Waiting for IMU data ... imu msg time (%0.2f) < time scan end time (%0.2f)", imuQueue.back().header.stamp.toSec(),
+                   timeScanEnd);
         }
         return false;
       }
@@ -454,8 +463,8 @@ public:
 
     cloudInfo->odomAvailable = true;
 
-    // petrlmat: The following code was commented out by me as it is not needed. Only position is extracted from the odometry to be later used in positional deskewing, which was commented out by the LIOSAM authors as it makes little difference.
-    // get end odometry at the end of the scan
+    // petrlmat: The following code was commented out by me as it is not needed. Only position is extracted from the odometry to be later used in positional
+    // deskewing, which was commented out by the LIOSAM authors as it makes little difference. get end odometry at the end of the scan
     /* odomDeskewFlag = false; */
 
     /* if (odomQueue.back().header.stamp.toSec() < timeScanEnd) { */
@@ -552,10 +561,10 @@ public:
     const double pointTime = timeScanCur + relTime;
 
     float rotXCur, rotYCur, rotZCur;
-    findRotation(pointTime, &rotXCur, &rotYCur, &rotZCur); // petrlmat: from imu only
+    findRotation(pointTime, &rotXCur, &rotYCur, &rotZCur);  // petrlmat: from imu only
 
     float posXCur, posYCur, posZCur;
-    findPosition(relTime, &posXCur, &posYCur, &posZCur); // petrlmat: not used, always zero position
+    findPosition(relTime, &posXCur, &posYCur, &posZCur);  // petrlmat: not used, always zero position
 
     if (firstPointFlag == true) {
       transStartInverse = (pcl::getTransformation(posXCur, posYCur, posZCur, rotXCur, rotYCur, rotZCur)).inverse();
@@ -577,7 +586,8 @@ public:
   /*//}*/
 
   /*//{ projectPointCloud() */
-  // petrlmat: this functions only copies points from one point cloud to another (of another type) when deskewing is disabled (default so far) - potential performance gain if we get rid of the copy
+  // petrlmat: this functions only copies points from one point cloud to another (of another type) when deskewing is disabled (default so far) - potential
+  // performance gain if we get rid of the copy
   void projectPointCloud() {
     // range image projection
     const unsigned int cloudSize = laserCloudIn->points.size();
@@ -592,7 +602,7 @@ public:
       }
 
       const int rowIdn = laserCloudIn->points.at(i).ring;
-      if (rowIdn < 0 || rowIdn >= N_SCAN) {
+      if (rowIdn < 0 || rowIdn >= scanHeight) {
         /* ROS_ERROR("Invalid ring: %d", rowIdn); */
         continue;
       }
@@ -610,13 +620,13 @@ public:
 
       // TODO: polish this monstrosity
       const float  horizonAngle = atan2(thisPoint.x, thisPoint.y) * 180 / M_PI;
-      static float ang_res_x    = 360.0 / float(Horizon_SCAN);
-      int          columnIdn    = -round((horizonAngle - 90.0) / ang_res_x) + Horizon_SCAN / 2;
-      if (columnIdn >= Horizon_SCAN) {
-        columnIdn -= Horizon_SCAN;
+      static float ang_res_x    = 360.0 / float(scanWidth);
+      int          columnIdn    = -round((horizonAngle - 90.0) / ang_res_x) + scanWidth / 2;
+      if (columnIdn >= scanWidth) {
+        columnIdn -= scanWidth;
       }
 
-      if (columnIdn < 0 || columnIdn >= Horizon_SCAN) {
+      if (columnIdn < 0 || columnIdn >= scanWidth) {
         continue;
       }
 
@@ -630,7 +640,7 @@ public:
 
       rangeMat.at<float>(rowIdn, columnIdn) = range;
 
-      const int index          = columnIdn + rowIdn * Horizon_SCAN;
+      const int index          = columnIdn + rowIdn * scanWidth;
       fullCloud->points[index] = thisPoint;
     }
   }
@@ -640,10 +650,10 @@ public:
   void cloudExtraction() {
     int count = 0;
     // extract segmented cloud for lidar odometry
-    for (int i = 0; i < N_SCAN; ++i) {
+    for (int i = 0; i < scanHeight; ++i) {
       cloudInfo->startRingIndex[i] = count - 1 + 5;
 
-      for (int j = 0; j < Horizon_SCAN; ++j) {
+      for (int j = 0; j < scanWidth; ++j) {
         /* ROS_WARN("i: %d, j: %d, rangeMat: %0.10f, isFltMax: %d", i, j, rangeMat.at<float>(i,j), rangeMat.at<float>(i,j) == FLT_MAX); */
         if (rangeMat.at<float>(i, j) != FLT_MAX) {
           /* ROS_WARN("i: %d, j: %d, rangeMat: %0.10f, isFltMax: %d", i, j, rangeMat.at<float>(i,j), rangeMat.at<float>(i,j) == FLT_MAX); */
@@ -652,7 +662,7 @@ public:
           // save range info
           cloudInfo->pointRange[count] = rangeMat.at<float>(i, j);
           // save extracted cloud
-          extractedCloud->push_back(fullCloud->points[j + i * Horizon_SCAN]);
+          extractedCloud->push_back(fullCloud->points[j + i * scanWidth]);
           // size of extracted cloud
           ++count;
         }
@@ -668,6 +678,17 @@ public:
     cloudInfo->cloud_deskewed = publishCloud(&pubExtractedCloud, extractedCloud, cloudHeader.stamp, lidarFrame);
     try {
       pubLaserCloudInfo.publish(cloudInfo);
+    }
+    catch (...) {
+      ROS_ERROR("[ImageProjection]: Exception caught during publishing topic %s.", pubLaserCloudInfo.getTopic().c_str());
+    }
+    
+    sensor_msgs::PointCloud2 cloudInfoOrig;
+    cloudInfoOrig.header = cloudHeader;
+    cloudInfoOrig.height = scanHeight;
+    cloudInfoOrig.width = scanWidth;
+    try {
+      pubOrigCloudInfo.publish(cloudInfoOrig);
     }
     catch (...) {
       ROS_ERROR("[ImageProjection]: Exception caught during publishing topic %s.", pubLaserCloudInfo.getTopic().c_str());

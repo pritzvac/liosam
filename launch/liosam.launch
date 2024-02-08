@@ -1,0 +1,163 @@
+<launch>
+
+  <arg name="UAV_NAME" default="$(env UAV_NAME)"/>
+  <arg name="RUN_TYPE" default="$(env RUN_TYPE)" />
+
+  <arg name="node_prefix" default=""/>
+
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="is_simulation" value="true" />
+  <arg if="$(eval arg('RUN_TYPE') == 'realworld')" name="is_simulation" value="false" />
+  <arg if="$(eval arg('RUN_TYPE') == 'simulation')" name="config_file" value="$(find liosam)/config/simulation.yaml" />
+  <arg if="$(eval arg('RUN_TYPE') == 'realworld')" name="config_file" value="$(find liosam)/config/realworld.yaml" />
+    
+  <arg name="frame_baselink" default="$(arg UAV_NAME)/base_link" />
+  <arg name="frame_lidar" default="$(arg UAV_NAME)/os_sensor" />
+  <arg name="frame_odom" default="$(arg UAV_NAME)/$(arg node_prefix)slam_origin" />
+  <arg name="frame_map" default="$(arg UAV_NAME)/$(arg node_prefix)slam_mapping_origin" />
+
+  <arg name="launch_delay" default="0"/>
+  <arg name="launch_prefix" default="" />
+  <arg name="nodelet" default="standalone"/>
+  <arg name="nodelet_manager" default=""/>
+    
+  <arg name="imu_type" default=""/>
+  <arg name="imu_config_file" default="$(find liosam)/config/imu/imu_$(arg imu_type).yaml"/>
+
+  <group ns="$(arg UAV_NAME)">
+   
+<!--//{ IMU preintegration nodelet -->
+    <node pkg="nodelet" type="nodelet" name="$(arg node_prefix)imu_preintegration" args="$(arg nodelet) liosam/ImuPreintegration $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+
+      <!-- config file --> 
+      <rosparam file="$(arg config_file)" command="load" />
+      <rosparam file="$(arg imu_config_file)" command="load" />
+
+      <!-- parameters -->
+      <param name="uavName" type="string" value="$(arg UAV_NAME)" />
+      <param name="lidarFrame" type="string" value="$(arg frame_lidar)" />
+      <param name="baselinkFrame" type="string" value="$(arg frame_baselink)" />
+      <param name="odometryFrame" type="string" value="$(arg frame_odom)" />
+
+      <!-- subscribers -->
+      <remap from="~liosam/preintegration/odom_mapping_incremental_in" to="$(arg node_prefix)liosam/mapping/odometry_incremental" />
+
+      <!-- publishers -->
+      <remap from="~liosam/preintegration/odom_preintegrated_out" to="$(arg node_prefix)liosam/preintegration/odometry" />
+      <remap from="~liosam/preintegration/lin_acc_out" to="$(arg node_prefix)liosam/preintegration/lin_acc" />
+      <remap from="~liosam/preintegration/ang_vel_out" to="$(arg node_prefix)liosam/preintegration/ang_vel" />
+      <remap from="~liosam/preintegration/lin_acc_bias_out" to="$(arg node_prefix)liosam/preintegration/lin_acc_bias" />
+      <remap from="~liosam/preintegration/ang_vel_bias_out" to="$(arg node_prefix)liosam/preintegration/ang_vel_bias" />
+
+    </node>
+<!--//}-->
+
+<!--//{ transform fusion nodelet -->
+       <node pkg="nodelet" type="nodelet" name="$(arg node_prefix)transform_fusion" args="$(arg nodelet) liosam/TransformFusion $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)"> 
+
+        <!-- config file --> 
+        <rosparam file="$(arg config_file)" command="load" />
+        <rosparam file="$(arg imu_config_file)" command="load" />
+
+        <!-- parameters -->
+        <param name="uavName" type="string" value="$(arg UAV_NAME)" /> 
+        <param name="lidarFrame" type="string" value="$(arg frame_lidar)" />
+        <param name="baselinkFrame" type="string" value="$(arg frame_baselink)" />
+        <param name="odometryFrame" type="string" value="$(arg frame_odom)" />
+        <param name="mapFrame" type="string" value="$(arg frame_map)" />
+
+        <!-- publishers --> 
+        <remap from="~fused_odometry_out" to="$(arg node_prefix)liosam/fusion/odometry" /> 
+        <remap from="~fused_path_out" to="$(arg node_prefix)liosam/fusion/path" /> 
+
+        <!-- subscribers --> 
+        <remap from="~odom_pre_incremental_in" to="$(arg node_prefix)liosam/preintegration/odometry" /> 
+        <remap from="~odom_mapping_in" to="$(arg node_prefix)liosam/mapping/odometry" /> 
+
+       </node> 
+<!-- //} -->
+
+<!--//{ image_projection nodelet -->
+      <node pkg="nodelet" type="nodelet" name="$(arg node_prefix)image_projection" args="$(arg nodelet) liosam/ImageProjection $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+
+        <!-- config file --> 
+        <rosparam file="$(arg config_file)" command="load" />
+        <rosparam file="$(arg imu_config_file)" command="load" />
+
+        <!-- parameters -->
+        <param name="uavName" type="string" value="$(arg UAV_NAME)" />
+        <param name="lidarFrame" type="string" value="$(arg frame_lidar)" />
+        <param name="baselinkFrame" type="string" value="$(arg frame_baselink)" />
+
+        <!-- subscribers -->
+        <remap from="~odom_incremental_in" to="$(arg node_prefix)liosam/odometry/preintegrated" />
+        <remap from="~cloud_in" to="os_cloud_nodelet/points_processed" />
+
+        <!-- publishers -->
+        <remap from="~liosam/deskew/deskewed_cloud_out" to="$(arg node_prefix)liosam/deskew/deskewed_cloud" />
+        <remap from="~liosam/deskew/deskewed_cloud_info_out" to="$(arg node_prefix)liosam/deskew/deskewed_cloud_info" />
+        <remap from="~liosam/deskew/orig_cloud_info_out" to="$(arg node_prefix)liosam/deskew/orig_cloud_info" />
+
+      </node>
+<!--//}-->
+
+<!--//{ feature extraction nodelet -->
+      <node pkg="nodelet" type="nodelet" name="$(arg node_prefix)feature_extraction" args="$(arg nodelet) liosam/FeatureExtraction $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+
+        <!-- config file --> 
+        <rosparam file="$(arg config_file)" command="load" />
+
+        <!-- parameters -->
+        <param name="uavName" type="string" value="$(arg UAV_NAME)" />
+        <param name="lidarFrame" type="string" value="$(arg frame_lidar)" />
+
+        <!-- subscribers -->
+        <remap from="~liosam/feature/deskewed_cloud_info_in" to="$(arg node_prefix)liosam/deskew/deskewed_cloud_info" />
+        <remap from="~liosam/feature/orig_cloud_info_in" to="$(arg node_prefix)liosam/deskew/orig_cloud_info" />
+
+        <!-- publishers -->
+        <remap from="~liosam/feature/cloud_info_out" to="$(arg node_prefix)liosam/feature/cloud_info" />
+        <remap from="~liosam/feature/cloud_corner_out" to="$(arg node_prefix)liosam/feature/cloud_corner" />
+        <remap from="~liosam/feature/cloud_surface_out" to="$(arg node_prefix)liosam/feature/cloud_surface" />
+
+      </node>
+<!--//}-->
+
+<!--//{ map_optimization nodelet -->
+      <node pkg="nodelet" type="nodelet" name="$(arg node_prefix)map_optimization" args="$(arg nodelet) liosam/MapOptimization $(arg nodelet_manager)" output="screen" launch-prefix="bash -c 'sleep $(arg launch_delay); $0 $@'; $(arg launch_prefix)">
+
+        <!-- config file --> 
+        <rosparam file="$(arg config_file)" command="load" />
+        <rosparam file="$(arg imu_config_file)" command="load" />
+
+        <!-- parameters -->
+        <param name="uavName" type="string" value="$(arg UAV_NAME)" />
+        <param name="lidarFrame" type="string" value="$(arg frame_lidar)" />
+        <param name="baselinkFrame" type="string" value="$(arg frame_baselink)" />
+        <param name="odometryFrame" type="string" value="$(arg frame_odom)" />
+
+        <!-- subscribers -->
+        <remap from="~liosam/mapping/cloud_info_in" to="$(arg node_prefix)liosam/feature/cloud_info" />
+        <remap from="~liosam/mapping/loop_closure_detection_in" to="$(arg node_prefix)liosam/loop_closure_detection_in" />
+        <remap from="~liosam/mapping/gps_in" to="$(arg node_prefix)liosam/mapping/gps_in" />
+        <remap from="~liosam/mapping/orientation_in" to="hw_api/orientation" />
+        <remap from="~liosam/mapping/orig_cloud_info_in" to="$(arg node_prefix)liosam/deskew/orig_cloud_info" />
+
+        <!-- publishers -->
+        <remap from="~liosam/mapping/trajectory_out" to="$(arg node_prefix)liosam/mapping/trajectory" />
+        <remap from="~liosam/mapping/map_global_out" to="$(arg node_prefix)liosam/mapping/map_global" />
+        <remap from="~liosam/mapping/odometry_out" to="$(arg node_prefix)liosam/mapping/odometry" />
+        <remap from="~liosam/mapping/odometry_incremental_out" to="$(arg node_prefix)liosam/mapping/odometry_incremental" />
+        <remap from="~liosam/mapping/path_out" to="$(arg node_prefix)liosam/mapping/path" />
+        <remap from="~liosam/mapping/icp_loop_closure_history_cloud_out" to="$(arg node_prefix)liosam/mapping/icp_loop_closure_history_cloud" />
+        <remap from="~liosam/mapping/icp_loop_closure_corrected_cloud_out" to="$(arg node_prefix)liosam/mapping/icp_loop_closure_corrected_cloud" />
+        <remap from="~liosam/mapping/loop_closure_constraints_out" to="$(arg node_prefix)liosam/mapping/loop_closure_constraints" />
+        <remap from="~liosam/mapping/map_local_out" to="$(arg node_prefix)liosam/mapping/map_local" />
+        <remap from="~liosam/mapping/cloud_registered_out" to="$(arg node_prefix)liosam/mapping/cloud_registered" />
+        <remap from="~liosam/mapping/cloud_registered_raw_out" to="$(arg node_prefix)lioam/cloud_registered_raw" />
+
+      </node>
+<!--//}-->
+
+  </group>
+
+</launch>

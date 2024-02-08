@@ -16,17 +16,11 @@
   </class>
 </library>
 
-<library path="lib/libMotorSpeedPreintegration">
-  <class name="liosam/MotorSpeedPreintegration" type="liosam::motor_speed_preintegration::MotorSpeedPreintegration" base_class_type="nodelet::Nodelet">
-    <description>MotorSpeedPreintegration nodelet</description>
+<library path="lib/libImuPreintegration">
+  <class name="liosam/ImuPreintegration" type="liosam::imu_preintegration::ImuPreintegration" base_class_type="nodelet::Nodelet">
+    <description>ImuPreintegration nodelet</description>
   </class>
 </library>
-
-<!-- <library path="lib/libImuPreintegration"> -->
-<!--   <class name="liosam/ImuPreintegration" type="liosam::imu_preintegration::ImuPreintegration" base_class_type="nodelet::Nodelet"> -->
-<!--     <description>ImuPreintegration nodelet</description> -->
-<!--   </class> -->
-<!-- </library> -->
 
 <library path="lib/libTransformFusion">
   <class name="liosam/TransformFusion" type="liosam::transform_fusion::TransformFusion" base_class_type="nodelet::Nodelet">

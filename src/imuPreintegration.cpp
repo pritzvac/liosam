@@ -5,9 +5,9 @@
 #include <gtsam/slam/PriorFactor.h>
 #include <gtsam/slam/BetweenFactor.h>
 #include <gtsam/navigation/GPSFactor.h>
-/* #include <gtsam/navigation/ImuFactor.h> */
-/* #include <gtsam/navigation/CombinedImuFactor.h> */
-/* #include <gtsam/navigation/ImuBias.h> */
+#include <gtsam/navigation/ImuFactor.h>
+#include <gtsam/navigation/CombinedImuFactor.h>
+#include <gtsam/navigation/ImuBias.h>
 #include <gtsam/nonlinear/NonlinearFactorGraph.h>
 #include <gtsam/nonlinear/LevenbergMarquardtOptimizer.h>
 #include <gtsam/nonlinear/Marginals.h>
@@ -17,12 +17,8 @@
 #include <gtsam/nonlinear/ISAM2.h>
 #include <gtsam_unstable/nonlinear/IncrementalFixedLagSmoother.h>
 
-#include <motor_speed_factor/motor_speed_factor.h>
-#include <motor_speed_factor/motor_speed_bias.h>
-
 using gtsam::symbol_shorthand::B;  // Bias    (ax,ay,az,gx,gy,gz)
 using gtsam::symbol_shorthand::V;  // Lin Vel (xdot,ydot,zdot)
-using gtsam::symbol_shorthand::W;  // Ang Vel (rdot,pdot,ydot)
 using gtsam::symbol_shorthand::X;  // Pose3   (x,y,z,r,p,y)
 
 namespace liosam
@@ -30,16 +26,15 @@ namespace liosam
   namespace imu_preintegration
   {
 
-    /*//{ class MotorSpeedPreintegrationImpl() */
-    class MotorSpeedPreintegrationImpl
+    /*//{ class ImuPreintegration() */
+    class ImuPreintegration : public nodelet::Nodelet
     {
     public:
       /*//{ parameters */
       std::string uavName;
 
       // Topics
-      string motorSpeedTopic;
-      string odomTopic;
+      string imuTopic;
 
       // Frames
       std::string lidarFrame;
@@ -48,19 +43,12 @@ namespace liosam
       std::string odometryFrame;
 
       // IMU
-      string imuType;
+      double gravity;
 
-      // Motor Speeds
-      int numMotors;
-      float mass;
-      float gravity;
-      float propMass;
-      float motorConstant;
-      float momentConstant;
-      float linAccNoise;
-      float angAccNoise;
-      float linAccBiasNoise;
-      float angAccBiasNoise;
+      double linAccBiasNoise;
+      double angVelBiasNoise;
+      double linAccNoise;
+      double angVelNoise;
 
       /*//}*/
 
@@ -73,13 +61,13 @@ namespace liosam
 
       std::mutex mtx;
 
-      ros::Subscriber subMotorSpeed;
+      ros::Subscriber subImu;
       ros::Subscriber subOdometry;
-      ros::Publisher pubImuOdometry;
+      ros::Publisher pubPreOdometry;
       ros::Publisher pubLinAcc;
       ros::Publisher pubLinAccBias;
-      ros::Publisher pubAngAcc;
-      ros::Publisher pubAngAccBias;
+      ros::Publisher pubAngVel;
+      ros::Publisher pubAngVelBias;
 
       bool systemInitialized = false;
 
@@ -92,24 +80,23 @@ namespace liosam
       gtsam::Vector noiseModelBetweenBias;
 
 
-      gtsam::PreintegratedMotorSpeedMeasurements* motorSpeedIntegratorOpt_;
-      gtsam::PreintegratedMotorSpeedMeasurements* motorSpeedIntegratorPredict_;
+      gtsam::PreintegratedImuMeasurements* imuIntegratorOpt_;
+      gtsam::PreintegratedImuMeasurements* imuIntegratorPredict_;
 
-      std::deque<mrs_msgs::Float64ArrayStamped> motorSpeedQueOpt;
-      std::deque<mrs_msgs::Float64ArrayStamped> motorSpeedQueImu;
+      std::deque<sensor_msgs::Imu> imuQueOpt;
+      std::deque<sensor_msgs::Imu> imuQuePredict;
 
       gtsam::Pose3 prevPose_;
       gtsam::Vector3 prevLinVel_;
-      gtsam::Vector3 prevAngVel_;
-      gtsam::FullState prevState_;
-      gtsam::motor_speed_bias::ConstantBias prevBias_;
+      gtsam::NavState prevState_;
+      gtsam::imuBias::ConstantBias prevBias_;
 
-      gtsam::FullState prevStateOdom;
-      gtsam::motor_speed_bias::ConstantBias prevBiasOdom;
+      gtsam::NavState prevStateOdom_;
+      gtsam::imuBias::ConstantBias prevBiasOdom_;
 
       bool doneFirstOpt = false;
-      double lastMotorSpeedT_predict = -1;
-      double lastMotorSpeedT_opt = -1;
+      double lastImuT_predict = -1;
+      double lastImuT_opt = -1;
 
       gtsam::ISAM2 optimizer;
       gtsam::NonlinearFactorGraph graphFactors;
@@ -119,44 +106,32 @@ namespace liosam
 
       int key = 1;
 
-      const gtsam::Pose3 imu2Lidar =
-          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-tfLidar2Imu.getOrigin().x(), -tfLidar2Imu.getOrigin().y(), -tfLidar2Imu.getOrigin().z()));
-      const gtsam::Pose3 lidar2Imu =
-          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(), tfLidar2Imu.getOrigin().z()));
+      gtsam::Pose3 imu2Lidar;
+      gtsam::Pose3 lidar2Imu;
 
     public:
-      /*//{ MotorSpeedPreintegrationImpl() */
-      MotorSpeedPreintegrationImpl(ros::NodeHandle& nh_)
+      /*//{ onInit() */
+      virtual void onInit()
       {
-
-        /*//{ loade parameters */
-        mrs_lib::ParamLoader pl(nh_, ros::this_node::getName());
+        ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+        /*//{ load parameters */
+        mrs_lib::ParamLoader pl(nh, "ImuPreintegration");
 
         pl.loadParam("uavName", uavName);
 
-        pl.loadParam("liosam/imuType", imuType);
-        ROS_INFO("[%s]: loaded imuType: %s", ros::this_node::getName().c_str(), imuType.c_str());
+        pl.loadParam("lidarFrame", lidarFrame);
+        pl.loadParam("baselinkFrame", baselinkFrame);
+        pl.loadParam("odometryFrame", odometryFrame);
 
-        pl.loadParam("liosam/odomTopic", odomTopic);
-        addNamespace("/" + uavName, odomTopic);
-
-        pl.loadParam("liosam/lidarFrame", lidarFrame, std::string("base_link"));
-        pl.loadParam("liosam/" + imuType + "/frame", imuFrame);
-        pl.loadParam("liosam/baselinkFrame", baselinkFrame, std::string("base_link"));
-        pl.loadParam("liosam/odometryFrame", odometryFrame, std::string("odom"));
-
-        pl.loadParam("liosam/motor_speeds/mass", mass, 3.0f);
-        pl.loadParam("liosam/motor_speeds/gravity", gravity, 9.81f);
-        pl.loadParam("liosam/motor_speeds/numMotors", numMotors, 4);
-        pl.loadParam("liosam/motor_speeds/propMass", propMass, 0.005f);
-        pl.loadParam("liosam/motor_speeds/motorConstant", motorConstant, 10.0f);
-        pl.loadParam("liosam/motor_speeds/momentConstant", momentConstant, 0.01f);
-
-        pl.loadParam("liosam/motor_speeds/linAccBiasNoise", linAccBiasNoise, 0.0002f);
-        pl.loadParam("liosam/motor_speeds/angAccBiasNoise", angAccBiasNoise, 0.00003f);
-
-        pl.loadParam("liosam/motor_speeds/linAccNoise", linAccNoise, 0.01f);
-        pl.loadParam("liosam/motor_speeds/angAccNoise", angAccNoise, 0.001f);
+        pl.loadParam("imu/topic", imuTopic);
+        addNamespace("/" + uavName, imuTopic);
+        pl.loadParam("imu/frame_id", imuFrame);
+        addNamespace("/" + uavName, imuFrame);
+        pl.loadParam("imu/gravity", gravity);
+        pl.loadParam("imu/noise/linAccBias", linAccBiasNoise);
+        pl.loadParam("imu/noise/angVelBias", angVelBiasNoise);
+        pl.loadParam("imu/noise/linAcc", linAccNoise);
+        pl.loadParam("imu/noise/angVel", angVelNoise);
 
         if (!pl.loadedSuccessfully())
         {
@@ -168,29 +143,29 @@ namespace liosam
         tf::StampedTransform tfLidar2Baselink;
         findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
-        subMotorSpeed = nh_.subscribe<mrs_msgs::Float64ArrayStamped>(motorSpeedTopic, 10, &MotorSpeedPreintegrationImpl::motorSpeedHandler, this,
+        imu2Lidar =
+          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-tfLidar2Imu.getOrigin().x(), -tfLidar2Imu.getOrigin().y(), -tfLidar2Imu.getOrigin().z()));
+        lidar2Imu =
+          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(), tfLidar2Imu.getOrigin().z()));
+
+
+        subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 10, &ImuPreintegration::imuHandler, this,
                                                                      ros::TransportHints().tcpNoDelay());
-        subOdometry = nh_.subscribe<nav_msgs::Odometry>("liosam/mapping/odometry_incremental", 5, &MotorSpeedPreintegrationImpl::odometryHandler, this,
+        subOdometry = nh.subscribe<nav_msgs::Odometry>("liosam/preintegration/odom_mapping_incremental_in", 5, &ImuPreintegration::odometryHandler, this,
                                                         ros::TransportHints().tcpNoDelay());
 
-        pubImuOdometry = nh_.advertise<nav_msgs::Odometry>(odomTopic + "_incremental", 10);
-        pubLinAcc = nh_.advertise<geometry_msgs::Vector3Stamped>("lin_acc", 10);
-        pubLinAccBias = nh_.advertise<geometry_msgs::Vector3Stamped>("lin_acc_bias", 10);
-        pubAngAcc = nh_.advertise<geometry_msgs::Vector3Stamped>("ang_acc", 10);
-        pubAngAccBias = nh_.advertise<geometry_msgs::Vector3Stamped>("ang_acc_bias", 10);
+        pubPreOdometry = nh.advertise<nav_msgs::Odometry>("liosam/preintegration/odom_preintegrated_out", 10);
+        pubLinAcc = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_out", 10);
+        pubLinAccBias = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_vel_out", 10);
+        pubAngVel = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_bias_out", 10);
+        pubAngVelBias = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_vel_bias_out", 10);
 
-        boost::shared_ptr<gtsam::MotorSpeedParams> p = gtsam::MotorSpeedParams::MakeSharedU(gravity);
-        p->setMass(mass + numMotors * propMass);
-        p->setMotorConstant(motorConstant);
-        p->setMomentConstant(momentConstant);
-        p->setNumRotors(numMotors);
-        p->setRotorDirs(std::vector<int>{-1, -1, 1, 1});
-        /* p->accelerometerCovariance                       = gtsam::Matrix33::Identity(3, 3) * pow(imuAccNoise, 2);  // acc white noise in continuous */
-        /* p->gyroscopeCovariance                           = gtsam::Matrix33::Identity(3, 3) * pow(imuGyrNoise, 2);  // gyro white noise in continuous */
-        p->setAccelerationCovariance(gtsam::Matrix33::Identity(3, 3) * pow(linAccNoise, 2));  // acc white noise in continuous
-        p->setAlphaCovariance(gtsam::Matrix33::Identity(3, 3) * pow(angAccNoise, 2));         // acc white noise in continuous
-        p->integrationCovariance = gtsam::Matrix33::Identity(3, 3) * pow(1e-4, 2);            // error committed in integrating position from velocities
-        gtsam::motor_speed_bias::ConstantBias prior_imu_bias((gtsam::Vector(6) << 0, 0, 0, 0, 0, 0).finished());  // assume zero initial bias
+        boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(gravity);
+        p->accelerometerCovariance                       = gtsam::Matrix33::Identity(3, 3) * pow(linAccNoise, 2);  // acc white noise in continuous
+        p->gyroscopeCovariance                           = gtsam::Matrix33::Identity(3, 3) * pow(angVelNoise, 2);  // gyro white noise in continuous
+        p->integrationCovariance = gtsam::Matrix33::Identity(3, 3) * pow(1e-4, 2);                       // error committed in integrating position from velocities
+
+        gtsam::imuBias::ConstantBias prior_imu_bias((gtsam::Vector(6) << 0, 0, 0, 0, 0, 0).finished());  // assume zero initial bias
 
         priorPoseNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2).finished());  // rad,rad,rad,m, m, m
         priorLinVelNoise = gtsam::noiseModel::Isotropic::Sigma(3, 1e4);                                                             // m/s
@@ -198,11 +173,12 @@ namespace liosam
         priorBiasNoise = gtsam::noiseModel::Isotropic::Sigma(6, 1e-3);  // 1e-2 ~ 1e-3 seems to be good
         correctionNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 0.05, 0.05, 0.05, 0.1, 0.1, 0.1).finished());  // rad,rad,rad,m, m, m
         correctionNoise2 = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1, 1, 1, 1, 1, 1).finished());                // rad,rad,rad,m, m, m
-        noiseModelBetweenBias = (gtsam::Vector(6) << linAccBiasNoise, linAccBiasNoise, linAccBiasNoise, angAccBiasNoise, angAccBiasNoise, angAccBiasNoise).finished();
+        noiseModelBetweenBias = (gtsam::Vector(6) << linAccBiasNoise, linAccBiasNoise, linAccBiasNoise, angVelBiasNoise, angVelBiasNoise, angVelBiasNoise).finished();
 
-        motorSpeedIntegratorPredict_ = new gtsam::PreintegratedMotorSpeedMeasurements(p);  // setting up the IMU integration for IMU message thread
-        motorSpeedIntegratorOpt_ = new gtsam::PreintegratedMotorSpeedMeasurements(p);      // setting up the IMU integration for optimization
-        ROS_INFO("[ImuPreintegration]: initialized");
+        imuIntegratorPredict_ = new gtsam::PreintegratedImuMeasurements(p);  // setting up the IMU integration for IMU message thread
+        imuIntegratorOpt_ = new gtsam::PreintegratedImuMeasurements(p);      // setting up the IMU integration for optimization
+
+        ROS_INFO("\033[1;32m----> [ImuPreintegration]: initialized.\033[0m");
       }
       /*//}*/
 
@@ -225,7 +201,7 @@ namespace liosam
       /*//{ resetParams() */
       void resetParams()
       {
-        lastMotorSpeedT_predict = -1;
+        lastImuT_predict = -1;
         doneFirstOpt = false;
         systemInitialized = false;
       }
@@ -240,7 +216,7 @@ namespace liosam
         const double currentCorrectionTime = ROS_TIME(odomMsg);
 
         // make sure we have imu data to integrate
-        if (motorSpeedQueOpt.empty())
+        if (imuQueOpt.empty())
         {
           return;
         }
@@ -262,12 +238,12 @@ namespace liosam
           resetOptimization();
 
           // pop old IMU message
-          while (!motorSpeedQueOpt.empty())
+          while (!imuQueOpt.empty())
           {
-            if (ROS_TIME(&motorSpeedQueOpt.front()) < currentCorrectionTime - delta_t)
+            if (ROS_TIME(&imuQueOpt.front()) < currentCorrectionTime - delta_t)
             {
-              lastMotorSpeedT_opt = ROS_TIME(&motorSpeedQueOpt.front());
-              motorSpeedQueOpt.pop_front();
+              lastImuT_opt = ROS_TIME(&imuQueOpt.front());
+              imuQueOpt.pop_front();
             } else
             {
               break;
@@ -284,20 +260,14 @@ namespace liosam
           const gtsam::PriorFactor<gtsam::Vector3> priorLinVel(V(0), prevLinVel_, priorLinVelNoise);
           graphFactors.add(priorLinVel);
 
-          // initial angular velocity
-          prevAngVel_ = gtsam::Vector3(0, 0, 0);
-          const gtsam::PriorFactor<gtsam::Vector3> priorAngVel(V(0), prevAngVel_, priorAngVelNoise);
-          graphFactors.add(priorAngVel);
-
           // initial bias
-          prevBias_ = gtsam::motor_speed_bias::ConstantBias();
-          const gtsam::PriorFactor<gtsam::motor_speed_bias::ConstantBias> priorBias(B(0), prevBias_, priorBiasNoise);
+          prevBias_ = gtsam::imuBias::ConstantBias();
+          const gtsam::PriorFactor<gtsam::imuBias::ConstantBias> priorBias(B(0), prevBias_, priorBiasNoise);
           graphFactors.add(priorBias);
 
           // add values
           graphValues.insert(X(0), prevPose_);
           graphValues.insert(V(0), prevLinVel_);
-          graphValues.insert(W(0), prevAngVel_);
           graphValues.insert(B(0), prevBias_);
 
           // optimize once
@@ -305,8 +275,8 @@ namespace liosam
           graphFactors.resize(0);
           graphValues.clear();
 
-          motorSpeedIntegratorPredict_->resetIntegration();
-          motorSpeedIntegratorOpt_->resetIntegration();
+          imuIntegratorPredict_->resetIntegrationAndSetBias(prevBias_);
+          imuIntegratorOpt_->resetIntegrationAndSetBias(prevBias_);
 
           key = 1;
           systemInitialized = true;
@@ -315,33 +285,36 @@ namespace liosam
 
 
         // reset graph for speed
-        if (key == 100)
+        if (key == 100) 
         {
+
           ROS_INFO("[ImuPreintegration]: resetting graph");
+
           // get updated noise before reset
           const gtsam::noiseModel::Gaussian::shared_ptr updatedPoseNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(X(key - 1)));
           const gtsam::noiseModel::Gaussian::shared_ptr updatedLinVelNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(V(key - 1)));
-          const gtsam::noiseModel::Gaussian::shared_ptr updatedAngVelNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(W(key - 1)));
           const gtsam::noiseModel::Gaussian::shared_ptr updatedBiasNoise = gtsam::noiseModel::Gaussian::Covariance(optimizer.marginalCovariance(B(key - 1)));
+
           // reset graph
           resetOptimization();
+
           // add pose
           const gtsam::PriorFactor<gtsam::Pose3> priorPose(X(0), prevPose_, updatedPoseNoise);
           graphFactors.add(priorPose);
+
           // add linear velocity
           const gtsam::PriorFactor<gtsam::Vector3> priorLinVel(V(0), prevLinVel_, updatedLinVelNoise);
           graphFactors.add(priorLinVel);
-          // add angular velocity
-          const gtsam::PriorFactor<gtsam::Vector3> priorAngVel(W(0), prevAngVel_, updatedAngVelNoise);
-          graphFactors.add(priorAngVel);
+
           // add bias
-          const gtsam::PriorFactor<gtsam::motor_speed_bias::ConstantBias> priorBias(B(0), prevBias_, updatedBiasNoise);
+          const gtsam::PriorFactor<gtsam::imuBias::ConstantBias> priorBias(B(0), prevBias_, updatedBiasNoise);
           graphFactors.add(priorBias);
+
           // add values
           graphValues.insert(X(0), prevPose_);
           graphValues.insert(V(0), prevLinVel_);
-          graphValues.insert(W(0), prevAngVel_);
           graphValues.insert(B(0), prevBias_);
+
           // optimize once
           optimizer.update(graphFactors, graphValues);
           graphFactors.resize(0);
@@ -352,79 +325,77 @@ namespace liosam
 
 
         // 1. integrate imu data and optimize
-        while (!motorSpeedQueOpt.empty())
+        while (!imuQueOpt.empty())
         {
           // pop and integrate imu data that is between two optimizations
-          const mrs_msgs::Float64ArrayStamped* thisMotorSpeeds = &motorSpeedQueOpt.front();
-          const double imuTime = ROS_TIME(thisMotorSpeeds);
+          const sensor_msgs::Imu* thisImu = &imuQueOpt.front();
+          const double imuTime = ROS_TIME(thisImu);
           if (imuTime < currentCorrectionTime - delta_t)
           {
-            const double dt = (lastMotorSpeedT_opt < 0) ? (1.0 / 500.0) : (imuTime - lastMotorSpeedT_opt);
+            const double dt = (lastImuT_opt < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_opt);
 
             if (dt <= 0)
             {
-              ROS_WARN_COND(dt < 0, "invalid dt (opt): (%0.2f - %0.2f) = %0.2f", imuTime, lastMotorSpeedT_opt, dt);
-              motorSpeedQueOpt.pop_front();
+              ROS_WARN_COND(dt < 0, "invalid dt (opt): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_opt, dt);
+              imuQueOpt.pop_front();
               continue;
             }
 
-            motorSpeedIntegratorOpt_->integrateMeasurement(
-                gtsam::Vector4(thisMotorSpeeds->values[0], thisMotorSpeeds->values[1], thisMotorSpeeds->values[2], thisMotorSpeeds->values[3]), dt);
-            ROS_INFO("[ImuPreintegration]: motor speeds: %.2f %.2f %.2f %.2f dt: %.2f", thisMotorSpeeds->values[0], thisMotorSpeeds->values[1],
-                     thisMotorSpeeds->values[2], thisMotorSpeeds->values[3], dt);
+          imuIntegratorOpt_->integrateMeasurement(gtsam::Vector3(thisImu->linear_acceleration.x, thisImu->linear_acceleration.y, thisImu->linear_acceleration.z), 
+              gtsam::Vector3(thisImu->angular_velocity.x, thisImu->angular_velocity.y, thisImu->angular_velocity.z), dt);
 
-            lastMotorSpeedT_opt = imuTime;
-            motorSpeedQueOpt.pop_front();
+            lastImuT_opt = imuTime;
+            imuQueOpt.pop_front();
           } else
           {
             break;
           }
         }
         // add imu factor to graph
-        const gtsam::PreintegratedMotorSpeedMeasurements& preint_motor_speeds =
-            dynamic_cast<const gtsam::PreintegratedMotorSpeedMeasurements&>(*motorSpeedIntegratorOpt_);
-        const gtsam::MotorSpeedFactor motor_speed_factor(X(key - 1), V(key - 1), W(key - 1), X(key), V(key), W(key), B(key), preint_motor_speeds);
-        const gtsam::Vector3 lin_acc_b = preint_motor_speeds.lastAcc();
-        const gtsam::Vector3 ang_acc_b = preint_motor_speeds.lastAlpha();
+    const gtsam::PreintegratedImuMeasurements& preint_imu = dynamic_cast<const gtsam::PreintegratedImuMeasurements&>(*imuIntegratorOpt_);
+    const gtsam::ImuFactor                     imu_factor(X(key - 1), V(key - 1), X(key), V(key), B(key - 1), preint_imu);
+        graphFactors.add(imu_factor);
 
-        graphFactors.add(motor_speed_factor);
         // add imu bias between factor
-        graphFactors.add(gtsam::BetweenFactor<gtsam::motor_speed_bias::ConstantBias>(
-            B(key - 1), B(key), gtsam::motor_speed_bias::ConstantBias(),
-            gtsam::noiseModel::Diagonal::Sigmas(sqrt(motorSpeedIntegratorOpt_->deltaTij()) * noiseModelBetweenBias)));
+        graphFactors.add(gtsam::BetweenFactor<gtsam::imuBias::ConstantBias>(
+            B(key - 1), B(key), gtsam::imuBias::ConstantBias(),
+            gtsam::noiseModel::Diagonal::Sigmas(sqrt(imuIntegratorOpt_->deltaTij()) * noiseModelBetweenBias)));
+
         // add pose factor
         const gtsam::Pose3 curPose = lidarPose.compose(lidar2Imu);
         const gtsam::PriorFactor<gtsam::Pose3> pose_factor(X(key), curPose, degenerate ? correctionNoise2 : correctionNoise);
         graphFactors.add(pose_factor);
+
         // insert predicted values
-        const gtsam::FullState propState_ = motorSpeedIntegratorOpt_->predict(prevState_, prevBias_);
+        const gtsam::NavState propState_ = imuIntegratorOpt_->predict(prevState_, prevBias_);
         graphValues.insert(X(key), propState_.pose());
         graphValues.insert(V(key), propState_.v());
-        graphValues.insert(W(key), propState_.w());
         graphValues.insert(B(key), prevBias_);
-        ROS_INFO("[ImuPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f ang_vel: %.2f %.2f %.2f",
+        ROS_INFO("[ImuPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f",
                  propState_.pose().translation().x(), propState_.pose().translation().y(), propState_.pose().translation().z(),
-                 propState_.pose().rotation().roll(), propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(), propState_.linVelocity()[0],
-                 propState_.linVelocity()[1], propState_.linVelocity()[2], propState_.angVelocity()[0], propState_.angVelocity()[1],
-                 propState_.angVelocity()[2]);
-        ROS_INFO("[ImuPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_acc_bias: %.2f %.2f %.2f", prevBias_.linAcc()[0], prevBias_.linAcc()[1],
-                 prevBias_.linAcc()[2], prevBias_.angAcc()[0], prevBias_.angAcc()[1], prevBias_.angAcc()[2]);
+                 propState_.pose().rotation().roll(), propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(), propState_.velocity()[0],
+                 propState_.velocity()[1], propState_.velocity()[2]);
+        ROS_INFO("[ImuPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_vel_bias: %.2f %.2f %.2f", prevBias_.accelerometer()[0], prevBias_.accelerometer()[1],
+                 prevBias_.accelerometer()[2], prevBias_.gyroscope()[0], prevBias_.gyroscope()[1], prevBias_.gyroscope()[2]);
+
         // optimize
-        cout << "****************************************************" << endl;
-        graphFactors.print("[ImuPreintegration]: graph\n");
+        /* cout << "****************************************************" << endl; */
+        /* graphFactors.print("[ImuPreintegration]: graph\n"); */
         optimizer.update(graphFactors, graphValues);
         optimizer.update();
         graphFactors.resize(0);
         graphValues.clear();
+
         // Overwrite the beginning of the preintegration for the next step.
         const gtsam::Values result = optimizer.calculateEstimate();
         prevPose_ = result.at<gtsam::Pose3>(X(key));
         prevLinVel_ = result.at<gtsam::Vector3>(V(key));
-        prevAngVel_ = result.at<gtsam::Vector3>(W(key));
-        prevState_ = gtsam::FullState(prevPose_, prevLinVel_, prevAngVel_);
-        prevBias_ = result.at<gtsam::motor_speed_bias::ConstantBias>(B(key));
+        prevState_ = gtsam::NavState(prevPose_, prevLinVel_);
+        prevBias_ = result.at<gtsam::imuBias::ConstantBias>(B(key));
+
         // Reset the optimization preintegration object.
-        motorSpeedIntegratorOpt_->resetIntegration();
+        imuIntegratorOpt_->resetIntegration();
+
         // check optimization
         if (failureDetection(prevLinVel_, prevBias_))
         {
@@ -434,70 +405,57 @@ namespace liosam
 
 
         // 2. after optiization, re-propagate imu odometry preintegration
-        prevStateOdom = prevState_;
-        prevBiasOdom = prevBias_;
+        prevStateOdom_ = prevState_;
+        prevBiasOdom_ = prevBias_;
+
         // first pop imu message older than current correction data
-        double lastMotorSpeedQT = -1;
-        while (!motorSpeedQueImu.empty() && ROS_TIME(&motorSpeedQueImu.front()) < currentCorrectionTime - delta_t)
+        double lastImuQT = -1;
+        while (!imuQuePredict.empty() && ROS_TIME(&imuQuePredict.front()) < currentCorrectionTime - delta_t)
         {
-          lastMotorSpeedQT = ROS_TIME(&motorSpeedQueImu.front());
-          motorSpeedQueImu.pop_front();
+          lastImuQT = ROS_TIME(&imuQuePredict.front());
+          imuQuePredict.pop_front();
         }
+
         // repropogate
-        if (!motorSpeedQueImu.empty())
+        if (!imuQuePredict.empty())
         {
           // reset bias use the newly optimized bias
-          motorSpeedIntegratorPredict_->resetIntegration();
+          imuIntegratorPredict_->resetIntegrationAndSetBias(prevBiasOdom_);
+
           // integrate imu message from the beginning of this optimization
-          for (int i = 0; i < (int)motorSpeedQueImu.size(); ++i)
+          for (int i = 0; i < (int)imuQuePredict.size(); ++i)
           {
-            mrs_msgs::Float64ArrayStamped* thisMotorSpeeds = &motorSpeedQueImu[i];
-            const double imuTime = ROS_TIME(thisMotorSpeeds);
-            const double dt = (lastMotorSpeedQT < 0) ? (1.0 / 500.0) : (imuTime - lastMotorSpeedQT);
+            sensor_msgs::Imu* thisImu = &imuQuePredict[i];
+            const double imuTime = ROS_TIME(thisImu);
+            const double dt = (lastImuQT < 0) ? (1.0 / 500.0) : (imuTime - lastImuQT);
 
             if (dt <= 0)
             {
-              ROS_WARN_COND(dt < 0, "invalid dt (QT): (%0.2f - %0.2f) = %0.2f", imuTime, lastMotorSpeedQT, dt);
+              ROS_WARN_COND(dt < 0, "invalid dt (QT): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuQT, dt);
               continue;
             }
 
-            motorSpeedIntegratorPredict_->integrateMeasurement(
-                gtsam::Vector4(thisMotorSpeeds->values[0], thisMotorSpeeds->values[1], thisMotorSpeeds->values[2], thisMotorSpeeds->values[3]), dt);
-            lastMotorSpeedQT = imuTime;
+          imuIntegratorPredict_->integrateMeasurement(gtsam::Vector3(thisImu->linear_acceleration.x, thisImu->linear_acceleration.y, thisImu->linear_acceleration.z),
+                                                  gtsam::Vector3(thisImu->angular_velocity.x, thisImu->angular_velocity.y, thisImu->angular_velocity.z), dt);
+            lastImuQT = imuTime;
           }
         }
-
-        geometry_msgs::Vector3Stamped lin_acc_msg;
-        lin_acc_msg.header.stamp = ros::Time::now();
-        lin_acc_msg.header.frame_id = "fcu";
-        lin_acc_msg.vector.x = lin_acc_b[0];
-        lin_acc_msg.vector.y = lin_acc_b[1];
-        lin_acc_msg.vector.z = lin_acc_b[2];
-        pubLinAcc.publish(lin_acc_msg);
 
         geometry_msgs::Vector3Stamped lin_acc_bias_msg;
         lin_acc_bias_msg.header.stamp = ros::Time::now();
         lin_acc_bias_msg.header.frame_id = "fcu";
-        lin_acc_bias_msg.vector.x = prevBias_.linAcc()[0];
-        lin_acc_bias_msg.vector.y = prevBias_.linAcc()[1];
-        lin_acc_bias_msg.vector.z = prevBias_.linAcc()[2];
+        lin_acc_bias_msg.vector.x = prevBias_.accelerometer()[0];
+        lin_acc_bias_msg.vector.y = prevBias_.accelerometer()[1];
+        lin_acc_bias_msg.vector.z = prevBias_.accelerometer()[2];
         pubLinAccBias.publish(lin_acc_bias_msg);
 
-        geometry_msgs::Vector3Stamped ang_acc_msg;
-        ang_acc_msg.header.stamp = ros::Time::now();
-        ang_acc_msg.header.frame_id = "fcu";
-        ang_acc_msg.vector.x = ang_acc_b[0];
-        ang_acc_msg.vector.y = ang_acc_b[1];
-        ang_acc_msg.vector.z = ang_acc_b[2];
-        pubAngAcc.publish(ang_acc_msg);
-
-        geometry_msgs::Vector3Stamped ang_acc_bias_msg;
-        ang_acc_bias_msg.header.stamp = ros::Time::now();
-        ang_acc_bias_msg.header.frame_id = "fcu";
-        ang_acc_bias_msg.vector.x = prevBias_.angAcc()[0];
-        ang_acc_bias_msg.vector.y = prevBias_.angAcc()[1];
-        ang_acc_bias_msg.vector.z = prevBias_.angAcc()[2];
-        pubAngAccBias.publish(ang_acc_bias_msg);
+        geometry_msgs::Vector3Stamped ang_vel_bias_msg;
+        ang_vel_bias_msg.header.stamp = ros::Time::now();
+        ang_vel_bias_msg.header.frame_id = "fcu";
+        ang_vel_bias_msg.vector.x = prevBias_.gyroscope()[0];
+        ang_vel_bias_msg.vector.y = prevBias_.gyroscope()[1];
+        ang_vel_bias_msg.vector.z = prevBias_.gyroscope()[2];
+        pubAngVelBias.publish(ang_vel_bias_msg);
 
         ++key;
         doneFirstOpt = true;
@@ -505,7 +463,7 @@ namespace liosam
       /*//}*/
 
       /*//{ failureDetection() */
-      bool failureDetection(const gtsam::Vector3& velCur, const gtsam::motor_speed_bias::ConstantBias& biasCur)
+      bool failureDetection(const gtsam::Vector3& velCur, const gtsam::imuBias::ConstantBias& biasCur)
       {
         const Eigen::Vector3f vel(velCur.x(), velCur.y(), velCur.z());
         if (vel.norm() > 30)
@@ -514,8 +472,8 @@ namespace liosam
           return true;
         }
 
-        const Eigen::Vector3f bla(biasCur.linAcc().x(), biasCur.linAcc().y(), biasCur.linAcc().z());
-        const Eigen::Vector3f baa(biasCur.angAcc().x(), biasCur.angAcc().y(), biasCur.angAcc().z());
+        const Eigen::Vector3f bla(biasCur.accelerometer().x(), biasCur.accelerometer().y(), biasCur.accelerometer().z());
+        const Eigen::Vector3f baa(biasCur.gyroscope().x(), biasCur.gyroscope().y(), biasCur.gyroscope().z());
         if (bla.norm() > 1.0 || baa.norm() > 1.0)
         {
           ROS_WARN("Large bias, reset IMU-preintegration!");
@@ -526,14 +484,16 @@ namespace liosam
       }
       /*//}*/
 
-      /*//{ motorSpeedHandler() */
-      void motorSpeedHandler(const mrs_msgs::Float64ArrayStamped::ConstPtr& msg_in)
+      /*//{ imuHandler() */
+      void imuHandler(const sensor_msgs::Imu::ConstPtr& msg_in)
       {
-        ROS_INFO_ONCE("[ImuPreintegration]: motorSpeedHandler first callback");
+        ROS_INFO_ONCE("[ImuPreintegration]: imuHandler first callback");
         std::lock_guard<std::mutex> lock(mtx);
 
-        motorSpeedQueOpt.push_back(*msg_in);
-        motorSpeedQueImu.push_back(*msg_in);
+        const sensor_msgs::Imu thisImu = imuConverter(*msg_in, extRot, extQRPY);
+
+        imuQueOpt.push_back(thisImu);
+        imuQuePredict.push_back(thisImu);
 
         if (doneFirstOpt == false)
         {
@@ -542,19 +502,20 @@ namespace liosam
         }
 
         const double imuTime = ROS_TIME(msg_in);
-        const double dt = (lastMotorSpeedT_predict < 0) ? (1.0 / 500.0) : (imuTime - lastMotorSpeedT_predict);
+        const double dt = (lastImuT_predict < 0) ? (1.0 / 500.0) : (imuTime - lastImuT_predict);
         if (dt <= 0)
         {
-          ROS_WARN_COND(dt < 0, "invalid dt (imu): (%0.2f - %0.2f) = %0.2f", imuTime, lastMotorSpeedT_predict, dt);
+          ROS_WARN_COND(dt < 0, "invalid dt (imu): (%0.2f - %0.2f) = %0.2f", imuTime, lastImuT_predict, dt);
           return;
         }
-        lastMotorSpeedT_predict = imuTime;
+        lastImuT_predict = imuTime;
 
         // integrate this single imu message
-        motorSpeedIntegratorPredict_->integrateMeasurement(gtsam::Vector4(msg_in->values[0], msg_in->values[1], msg_in->values[2], msg_in->values[3]), dt);
+        imuIntegratorPredict_->integrateMeasurement(gtsam::Vector3(thisImu.linear_acceleration.x, thisImu.linear_acceleration.y, thisImu.linear_acceleration.z),
+                                            gtsam::Vector3(thisImu.angular_velocity.x, thisImu.angular_velocity.y, thisImu.angular_velocity.z), dt);
 
         // predict odometry
-        const gtsam::FullState currentState = motorSpeedIntegratorPredict_->predict(prevStateOdom, prevBias_);
+        const gtsam::NavState currentState = imuIntegratorPredict_->predict(prevStateOdom_, prevBiasOdom_);
 
         // publish odometry
         nav_msgs::Odometry::Ptr odometry = boost::make_shared<nav_msgs::Odometry>();
@@ -574,36 +535,33 @@ namespace liosam
         odometry->pose.pose.orientation.z = lidarPose.rotation().toQuaternion().z();
         odometry->pose.pose.orientation.w = lidarPose.rotation().toQuaternion().w();
 
-        odometry->twist.twist.linear.x = currentState.linVelocity().x();
-        odometry->twist.twist.linear.y = currentState.linVelocity().y();
-        odometry->twist.twist.linear.z = currentState.linVelocity().z();
-        odometry->twist.twist.angular.x = currentState.angVelocity().x();
-        odometry->twist.twist.angular.y = currentState.angVelocity().y();
-        odometry->twist.twist.angular.z = currentState.angVelocity().z();
-        pubImuOdometry.publish(odometry);
+        odometry->twist.twist.linear.x = currentState.velocity().x();
+        odometry->twist.twist.linear.y = currentState.velocity().y();
+        odometry->twist.twist.linear.z = currentState.velocity().z();
+        odometry->twist.twist.angular.x = thisImu.angular_velocity.x + prevBiasOdom_.gyroscope().x();
+        odometry->twist.twist.angular.y = thisImu.angular_velocity.y + prevBiasOdom_.gyroscope().y();
+        odometry->twist.twist.angular.z = thisImu.angular_velocity.z + prevBiasOdom_.gyroscope().z();
+        pubPreOdometry.publish(odometry);
+
+        geometry_msgs::Vector3Stamped accBiasMsg;
+        accBiasMsg.header.stamp = ros::Time::now();
+        accBiasMsg.header.frame_id = "fcu";
+        accBiasMsg.vector.x = prevBiasOdom_.accelerometer().x();
+        accBiasMsg.vector.y = prevBiasOdom_.accelerometer().y();
+        accBiasMsg.vector.z = prevBiasOdom_.accelerometer().z();
+        pubLinAccBias.publish(accBiasMsg);
+
+        geometry_msgs::Vector3Stamped gyroBiasMsg;
+        gyroBiasMsg.header.stamp = ros::Time::now();
+        gyroBiasMsg.header.frame_id = "fcu";
+        gyroBiasMsg.vector.x = prevBiasOdom_.gyroscope().x();
+        gyroBiasMsg.vector.y = prevBiasOdom_.gyroscope().y();
+        gyroBiasMsg.vector.z = prevBiasOdom_.gyroscope().z();
+        pubAngVelBias.publish(gyroBiasMsg);
       }
       /*//}*/
     };
     /*//}*/
-
-    /* //{ class ImuPreintegration */
-
-    class ImuPreintegration : public nodelet::Nodelet
-    {
-
-    public:
-      virtual void onInit()
-      {
-        ros::NodeHandle nh_ = nodelet::Nodelet::getMTPrivateNodeHandle();
-        IP = std::make_unique<MotorSpeedPreintegrationImpl>(nh_);
-        ROS_INFO("\033[1;32m----> Motor Speed Preintegration Started.\033[0m");
-      };
-
-    private:
-      std::shared_ptr<MotorSpeedPreintegrationImpl> IP;
-    };
-
-    //}
 
   }  // namespace imu_preintegration
 }  // namespace liosam
