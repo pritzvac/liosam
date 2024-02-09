@@ -371,16 +371,16 @@ namespace liosam
         graphValues.insert(X(key), propState_.pose());
         graphValues.insert(V(key), propState_.v());
         graphValues.insert(B(key), prevBias_);
-        ROS_INFO("[ImuPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f",
-                 propState_.pose().translation().x(), propState_.pose().translation().y(), propState_.pose().translation().z(),
-                 propState_.pose().rotation().roll(), propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(), propState_.velocity()[0],
-                 propState_.velocity()[1], propState_.velocity()[2]);
-        ROS_INFO("[ImuPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_vel_bias: %.2f %.2f %.2f", prevBias_.accelerometer()[0], prevBias_.accelerometer()[1],
-                 prevBias_.accelerometer()[2], prevBias_.gyroscope()[0], prevBias_.gyroscope()[1], prevBias_.gyroscope()[2]);
+        /* ROS_INFO("[ImuPreintegration]: preintegrated: pos: %.2f %.2f %2.f rot: %.2f %.2f %.2f lin_vel: %.2f %.2f %.2f", */
+        /*          propState_.pose().translation().x(), propState_.pose().translation().y(), propState_.pose().translation().z(), */
+        /*          propState_.pose().rotation().roll(), propState_.pose().rotation().pitch(), propState_.pose().rotation().yaw(), propState_.velocity()[0], */
+        /*          propState_.velocity()[1], propState_.velocity()[2]); */
+        /* ROS_INFO("[ImuPreintegration]: lin_acc_bias: %.2f %.2f %.2f ang_vel_bias: %.2f %.2f %.2f", prevBias_.accelerometer()[0], prevBias_.accelerometer()[1], */
+        /*          prevBias_.accelerometer()[2], prevBias_.gyroscope()[0], prevBias_.gyroscope()[1], prevBias_.gyroscope()[2]); */
 
         // optimize
-        /* cout << "****************************************************" << endl; */
-        /* graphFactors.print("[ImuPreintegration]: graph\n"); */
+        cout << "****************************************************" << endl;
+        graphFactors.print("[ImuPreintegration]: graph\n");
         optimizer.update(graphFactors, graphValues);
         optimizer.update();
         graphFactors.resize(0);

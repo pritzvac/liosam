@@ -75,12 +75,12 @@ public:
     tf::StampedTransform tfLidar2Imu;
     findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
-    subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("odom_mapping_in", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+    subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("liosam/fusion/odom_mapping_in", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
     subImuOdometry =
-        nh.subscribe<nav_msgs::Odometry>("odom_imu_incremental_in", 2000, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
+        nh.subscribe<nav_msgs::Odometry>("liosam/fusion/odom_preintegrated_in", 10, &TransformFusion::imuOdometryHandler, this, ros::TransportHints().tcpNoDelay());
 
-    pubImuOdometry = nh.advertise<nav_msgs::Odometry>("fused_odometry_out", 2000);
-    pubImuPath     = nh.advertise<nav_msgs::Path>("fused_path_out", 1);
+    pubImuOdometry = nh.advertise<nav_msgs::Odometry>("liosam/fusion/odometry_out", 10);
+    pubImuPath     = nh.advertise<nav_msgs::Path>("liosam/fusion/path_out", 1);
 
     ROS_INFO("\033[1;32m----> [TransformFusion]: initialized.\033[0m");
     is_initialized_ = true;

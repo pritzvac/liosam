@@ -66,12 +66,12 @@
         <param name="mapFrame" type="string" value="$(arg frame_map)" />
 
         <!-- publishers --> 
-        <remap from="~fused_odometry_out" to="$(arg node_prefix)liosam/fusion/odometry" /> 
-        <remap from="~fused_path_out" to="$(arg node_prefix)liosam/fusion/path" /> 
+        <remap from="~liosam/fusion/odometry_out" to="$(arg node_prefix)liosam/fusion/odometry" /> 
+        <remap from="~liosam/fusion/path_out" to="$(arg node_prefix)liosam/fusion/path" /> 
 
         <!-- subscribers --> 
-        <remap from="~odom_pre_incremental_in" to="$(arg node_prefix)liosam/preintegration/odometry" /> 
-        <remap from="~odom_mapping_in" to="$(arg node_prefix)liosam/mapping/odometry" /> 
+        <remap from="~liosam/fusion/odom_preintegrated_in" to="$(arg node_prefix)liosam/preintegration/odometry" /> 
+        <remap from="~liosam/fusion/odom_mapping_in" to="$(arg node_prefix)liosam/mapping/odometry" /> 
 
        </node> 
 <!-- //} -->
