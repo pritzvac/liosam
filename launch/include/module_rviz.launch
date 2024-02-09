@@ -1,9 +1,0 @@
-<launch>
-
-    <arg name="project" default="liosam"/>
-    <arg name="config" default="uav1.rviz"/>
-
-    <!--- Run Rviz-->
-    <node pkg="rviz" type="rviz" name="$(arg project)_rviz" args="-d $(find liosam)/launch/include/config/$(arg config)" />
-
-</launch>
