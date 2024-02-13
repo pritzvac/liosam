@@ -208,6 +208,9 @@ public:
           pubImuPath.publish(imuPath);
         }
       }
+
+        const double hdg = mrs_lib::AttitudeConverter(laserOdometry->pose.pose.orientation).getHeading();
+        ROS_INFO_THROTTLE(1.0, "[TransformFusion]: pos: [%.2f %.2f %.2f] vel: [%.2f %.2f %.2f] hdg: %.2f", laserOdometry->pose.pose.position.x, laserOdometry->pose.pose.position.y, laserOdometry->pose.pose.position.z, laserOdometry->twist.twist.linear.x, laserOdometry->twist.twist.linear.y, laserOdometry->twist.twist.linear.z, hdg);
     }
   }
   /*//}*/

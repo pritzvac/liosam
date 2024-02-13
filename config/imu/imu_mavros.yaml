@@ -9,5 +9,5 @@ imu:
   noise:
     linAcc: 0.006
     angVel: 0.00018665
-    linAccBias: 0.006
-    angVelBias: 0.000038785
+    linAccBias: 0.001
+    angVelBias: 0.00001

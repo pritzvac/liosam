@@ -68,12 +68,12 @@ namespace liosam
       ros::Publisher pubLinAccBias;
       ros::Publisher pubAngVel;
       ros::Publisher pubAngVelBias;
+      ros::Publisher pubDeltaV;
 
       bool systemInitialized = false;
 
       gtsam::noiseModel::Diagonal::shared_ptr priorPoseNoise;
       gtsam::noiseModel::Diagonal::shared_ptr priorLinVelNoise;
-      gtsam::noiseModel::Diagonal::shared_ptr priorAngVelNoise;
       gtsam::noiseModel::Diagonal::shared_ptr priorBiasNoise;
       gtsam::noiseModel::Diagonal::shared_ptr correctionNoise;
       gtsam::noiseModel::Diagonal::shared_ptr correctionNoise2;
@@ -108,6 +108,8 @@ namespace liosam
 
       gtsam::Pose3 imu2Lidar;
       gtsam::Pose3 lidar2Imu;
+
+      bool isInitialized_ = false;
 
     public:
       /*//{ onInit() */
@@ -149,16 +151,17 @@ namespace liosam
           gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(), tfLidar2Imu.getOrigin().z()));
 
 
-        subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 10, &ImuPreintegration::imuHandler, this,
+        subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImuPreintegration::imuHandler, this,
                                                                      ros::TransportHints().tcpNoDelay());
         subOdometry = nh.subscribe<nav_msgs::Odometry>("liosam/preintegration/odom_mapping_incremental_in", 5, &ImuPreintegration::odometryHandler, this,
                                                         ros::TransportHints().tcpNoDelay());
 
         pubPreOdometry = nh.advertise<nav_msgs::Odometry>("liosam/preintegration/odom_preintegrated_out", 10);
         pubLinAcc = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_out", 10);
-        pubLinAccBias = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_vel_out", 10);
-        pubAngVel = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_bias_out", 10);
+        pubLinAccBias = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/lin_acc_bias_out", 10);
+        pubAngVel = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_vel_out", 10);
         pubAngVelBias = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/ang_vel_bias_out", 10);
+        pubDeltaV = nh.advertise<geometry_msgs::Vector3Stamped>("liosam/preintegration/delta_v_out", 10);
 
         boost::shared_ptr<gtsam::PreintegrationParams> p = gtsam::PreintegrationParams::MakeSharedU(gravity);
         p->accelerometerCovariance                       = gtsam::Matrix33::Identity(3, 3) * pow(linAccNoise, 2);  // acc white noise in continuous
@@ -168,16 +171,16 @@ namespace liosam
         gtsam::imuBias::ConstantBias prior_imu_bias((gtsam::Vector(6) << 0, 0, 0, 0, 0, 0).finished());  // assume zero initial bias
 
         priorPoseNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2).finished());  // rad,rad,rad,m, m, m
-        priorLinVelNoise = gtsam::noiseModel::Isotropic::Sigma(3, 1e4);                                                             // m/s
-        priorAngVelNoise = gtsam::noiseModel::Isotropic::Sigma(3, 1e4);                                                             // m/s
+        priorLinVelNoise = gtsam::noiseModel::Isotropic::Sigma(3, 1e-2);                                                             // m/s
         priorBiasNoise = gtsam::noiseModel::Isotropic::Sigma(6, 1e-3);  // 1e-2 ~ 1e-3 seems to be good
         correctionNoise = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 0.05, 0.05, 0.05, 0.1, 0.1, 0.1).finished());  // rad,rad,rad,m, m, m
         correctionNoise2 = gtsam::noiseModel::Diagonal::Sigmas((gtsam::Vector(6) << 1, 1, 1, 1, 1, 1).finished());                // rad,rad,rad,m, m, m
         noiseModelBetweenBias = (gtsam::Vector(6) << linAccBiasNoise, linAccBiasNoise, linAccBiasNoise, angVelBiasNoise, angVelBiasNoise, angVelBiasNoise).finished();
 
-        imuIntegratorPredict_ = new gtsam::PreintegratedImuMeasurements(p);  // setting up the IMU integration for IMU message thread
-        imuIntegratorOpt_ = new gtsam::PreintegratedImuMeasurements(p);      // setting up the IMU integration for optimization
+        imuIntegratorPredict_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias);  // setting up the IMU integration for IMU message thread
+        imuIntegratorOpt_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias);      // setting up the IMU integration for optimization
 
+        isInitialized_ = true;
         ROS_INFO("\033[1;32m----> [ImuPreintegration]: initialized.\033[0m");
       }
       /*//}*/
@@ -210,6 +213,11 @@ namespace liosam
       /*//{ odometryHandler() */
       void odometryHandler(const nav_msgs::Odometry::ConstPtr& odomMsg)
       {
+
+        if (!isInitialized_) {
+          return;
+        }
+
         ROS_INFO_ONCE("[ImuPreintegration]: odometryHandler first callback");
         std::lock_guard<std::mutex> lock(mtx);
 
@@ -275,6 +283,15 @@ namespace liosam
           graphFactors.resize(0);
           graphValues.clear();
 
+          const gtsam::Values result = optimizer.calculateEstimate();
+          prevPose_ = result.at<gtsam::Pose3>(X(0));
+          prevLinVel_ = result.at<gtsam::Vector3>(V(0));
+          prevBias_ = result.at<gtsam::imuBias::ConstantBias>(B(0));
+          ROS_INFO("[ImuPreintegration]: initialized: pos: %.2f %.2f %2.f lin_vel: %.2f %.2f %.2f acc_bias: %.2f %.2f %.2f",
+                 prevPose_.translation().x(), prevPose_.translation().y(), prevPose_.translation().z(),
+                 prevLinVel_.x(), prevLinVel_.y(), prevLinVel_.z(),
+                 prevBias_.accelerometer().x(), prevBias_.accelerometer().y(), prevBias_.accelerometer().z());
+
           imuIntegratorPredict_->resetIntegrationAndSetBias(prevBias_);
           imuIntegratorOpt_->resetIntegrationAndSetBias(prevBias_);
 
@@ -324,6 +341,7 @@ namespace liosam
         }
 
 
+        bool      isImuIntegrated = false;
         // 1. integrate imu data and optimize
         while (!imuQueOpt.empty())
         {
@@ -346,11 +364,17 @@ namespace liosam
 
             lastImuT_opt = imuTime;
             imuQueOpt.pop_front();
+            isImuIntegrated = true;
           } else
           {
             break;
           }
         }
+
+    if (!isImuIntegrated) {
+      ROS_INFO("[ImuPreintegration]: No IMU measurements were integrated. Skipping optimization.");
+      return;
+    }
         // add imu factor to graph
     const gtsam::PreintegratedImuMeasurements& preint_imu = dynamic_cast<const gtsam::PreintegratedImuMeasurements&>(*imuIntegratorOpt_);
     const gtsam::ImuFactor                     imu_factor(X(key - 1), V(key - 1), X(key), V(key), B(key - 1), preint_imu);
@@ -363,6 +387,9 @@ namespace liosam
 
         // add pose factor
         const gtsam::Pose3 curPose = lidarPose.compose(lidar2Imu);
+        if (degenerate) {
+          ROS_WARN_THROTTLE(1.0, "[ImuPreintegration]: Mapping pose degenerate. Inflating pose noise.");
+        }
         const gtsam::PriorFactor<gtsam::Pose3> pose_factor(X(key), curPose, degenerate ? correctionNoise2 : correctionNoise);
         graphFactors.add(pose_factor);
 
@@ -379,8 +406,8 @@ namespace liosam
         /*          prevBias_.accelerometer()[2], prevBias_.gyroscope()[0], prevBias_.gyroscope()[1], prevBias_.gyroscope()[2]); */
 
         // optimize
-        cout << "****************************************************" << endl;
-        graphFactors.print("[ImuPreintegration]: graph\n");
+        /* cout << "****************************************************" << endl; */
+        /* graphFactors.print("[ImuPreintegration]: graph\n"); */
         optimizer.update(graphFactors, graphValues);
         optimizer.update();
         graphFactors.resize(0);
@@ -393,8 +420,16 @@ namespace liosam
         prevState_ = gtsam::NavState(prevPose_, prevLinVel_);
         prevBias_ = result.at<gtsam::imuBias::ConstantBias>(B(key));
 
+        geometry_msgs::Vector3Stamped delta_v_msg;
+        delta_v_msg.header.stamp = ros::Time::now();
+        delta_v_msg.header.frame_id = "fcu";
+        delta_v_msg.vector.x = preint_imu.deltaVij().x();
+        delta_v_msg.vector.y = preint_imu.deltaVij().y();
+        delta_v_msg.vector.z = preint_imu.deltaVij().z();
+        pubDeltaV.publish(delta_v_msg);
+
         // Reset the optimization preintegration object.
-        imuIntegratorOpt_->resetIntegration();
+        imuIntegratorOpt_->resetIntegrationAndSetBias(prevBias_);
 
         // check optimization
         if (failureDetection(prevLinVel_, prevBias_))
@@ -435,7 +470,7 @@ namespace liosam
               continue;
             }
 
-          imuIntegratorPredict_->integrateMeasurement(gtsam::Vector3(thisImu->linear_acceleration.x, thisImu->linear_acceleration.y, thisImu->linear_acceleration.z),
+            imuIntegratorPredict_->integrateMeasurement(gtsam::Vector3(thisImu->linear_acceleration.x, thisImu->linear_acceleration.y, thisImu->linear_acceleration.z),
                                                   gtsam::Vector3(thisImu->angular_velocity.x, thisImu->angular_velocity.y, thisImu->angular_velocity.z), dt);
             lastImuQT = imuTime;
           }
@@ -487,6 +522,11 @@ namespace liosam
       /*//{ imuHandler() */
       void imuHandler(const sensor_msgs::Imu::ConstPtr& msg_in)
       {
+
+        if (!isInitialized_) {
+          return;
+        }
+
         ROS_INFO_ONCE("[ImuPreintegration]: imuHandler first callback");
         std::lock_guard<std::mutex> lock(mtx);
 
@@ -558,6 +598,7 @@ namespace liosam
         gyroBiasMsg.vector.y = prevBiasOdom_.gyroscope().y();
         gyroBiasMsg.vector.z = prevBiasOdom_.gyroscope().z();
         pubAngVelBias.publish(gyroBiasMsg);
+
       }
       /*//}*/
     };

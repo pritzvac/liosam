@@ -55,6 +55,7 @@
 #include <mutex>
 
 #include <mrs_lib/param_loader.h>
+#include <mrs_lib/attitude_converter.h>
 
 #include <mrs_msgs/Float64ArrayStamped.h>
 
@@ -246,6 +247,12 @@ void findLidar2ImuTf(const string &lidarFrame, const string &imuFrame, const str
              tfLidar2Imu.getRotation().w());
 
   }
+/*//}*/
+
+/*//{ containsNan() */
+bool containsNan(const tf::Transform& tf) {
+  return isnan(tf.getOrigin().getX()) && isnan(tf.getOrigin().getY()) && isnan(tf.getOrigin().getZ()) && isnan(tf.getRotation().getX()) && isnan(tf.getRotation().getY()) && isnan(tf.getRotation().getZ()) && isnan(tf.getRotation().getW());
+}
 /*//}*/
 
 #endif // UTILITY_H

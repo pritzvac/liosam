@@ -411,11 +411,6 @@ public:
       return;
     }
 
-    if (!gotOrientation) {
-      ROS_INFO_THROTTLE(1.0, "[MapOptimization]: waiting for orientation");
-      return;
-    }
-
     ROS_INFO_ONCE("[MapOptimization]: laserCloudInfoHandler first callback");
 
     if (!isMemoryAllocated) {
@@ -476,6 +471,7 @@ public:
 
   }
   /*//}*/
+
   /*//{ gpsHandler() */
   void gpsHandler(const nav_msgs::Odometry::ConstPtr& gpsMsg) {
 
@@ -1522,6 +1518,9 @@ public:
       if (imuRPYInterpolate) {
         transformUpdate();
       }
+
+      incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
+
       isFirstMapOptimizationSuccessful = true;
 
     } else {
@@ -1555,8 +1554,6 @@ public:
         transformTobeMapped[1] = pitchMid;
       }
     }
-
-    incrementalOdometryAffineBack = trans2Affine3f(transformTobeMapped);
   }
   /*//}*/
 
@@ -1874,6 +1871,11 @@ public:
     T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));
 
     const tf::Transform T_odom = T * T_lidar;
+
+    if (containsNan(T_odom)) {
+      ROS_ERROR("[MapOptimization]: NaN found in T_odom");
+      return;
+    }
 
     // Publish in fcu frame
     nav_msgs::Odometry::Ptr laserOdometryROS = boost::make_shared<nav_msgs::Odometry>();
