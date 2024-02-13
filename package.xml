@@ -29,7 +29,7 @@
   <depend>message_runtime</depend>
 
   <depend>mrs_lib</depend>
-  <depend>GTSAM</depend>
+  <depend>gtsam</depend>
 
   <export>
     <nodelet plugin="${prefix}/plugins.xml" />
