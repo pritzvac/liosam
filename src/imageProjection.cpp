@@ -40,6 +40,8 @@ private:
   ros::Subscriber                subOdom;
   std::deque<nav_msgs::Odometry> odomQueue;
 
+  std::shared_ptr<mrs_lib::Transformer> transformer;
+
   std::deque<sensor_msgs::PointCloud2> cloudQueue;
   sensor_msgs::PointCloud2             currentCloudMsg;
 
@@ -89,6 +91,7 @@ private:
   float  lidarMaxRange;
 
   // IMU
+  bool   imuProvidesOrientation;
   bool   imuDeskew;
   string imuType;
 
@@ -108,12 +111,19 @@ public:
 
     ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
+    transformer = std::make_shared<mrs_lib::Transformer>(nh, "ImageProjection");
+
     /*//{ load parameters */
     mrs_lib::ParamLoader pl(nh, "ImageProjection");
 
     pl.loadParam("uavName", uavName);
 
+    pl.loadParam("imu/providesOrientation", imuProvidesOrientation);
     pl.loadParam("imu/deskew", imuDeskew);
+    if (imuDeskew && !imuProvidesOrientation) {
+      ROS_ERROR("[ImageProjection]: imu/deskew parameter requires 9-DoF IMU. Make sure the IMU provides orientation and set imu/providesOrientation to true.");
+      ros::shutdown();
+    }
     if (imuDeskew) {
       pl.loadParam("imu/frame_id", imuFrame);
       addNamespace(uavName, imuFrame);
@@ -137,8 +147,8 @@ public:
     /*//}*/
 
     if (imuDeskew) {
-      tf::StampedTransform tfLidar2Baselink, tfLidar2Imu;
-      findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+      geometry_msgs::TransformStamped tfLidar2Baselink, tfLidar2Imu;
+      findLidar2ImuTf(transformer, lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
       subImu = nh.subscribe<sensor_msgs::Imu>("imu_in", 2000, &ImageProjection::imuHandler, this, ros::TransportHints().tcpNoDelay());
     }
@@ -195,25 +205,13 @@ public:
 
   /*//{ imuHandler() */
   void imuHandler(const sensor_msgs::Imu::ConstPtr &imuMsg) {
-    const sensor_msgs::Imu thisImu = imuConverter(*imuMsg, extRot, extQRPY);
+    const sensor_msgs::Imu thisImu = imuConverter(*imuMsg, extRot, extQRPY, imuProvidesOrientation);
 
     ROS_INFO_ONCE("[ImageProjection]: imuHandler first callback");
 
     std::lock_guard<std::mutex> lock1(imuLock);
     imuQueue.push_back(thisImu);
 
-    // debug IMU data
-    /* cout << std::setprecision(6); */
-    /* cout << "IMU acc: " << endl; */
-    /* cout << "x: " << thisImu.linear_acceleration.x << ", y: " << thisImu.linear_acceleration.y << ", z: " << thisImu.linear_acceleration.z << endl; */
-    /* cout << "IMU gyro: " << endl; */
-    /* cout << "x: " << thisImu.angular_velocity.x << ", y: " << thisImu.angular_velocity.y << ", z: " << thisImu.angular_velocity.z << endl; */
-    /* double         imuRoll, imuPitch, imuYaw; */
-    /* tf::Quaternion orientation; */
-    /* tf::quaternionMsgToTF(thisImu.orientation, orientation); */
-    /* tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw); */
-    /* cout << "IMU roll pitch yaw: " << endl; */
-    /* cout << "roll: " << imuRoll << ", pitch: " << imuPitch << ", yaw: " << imuYaw << endl << endl; */
   }
   /*//}*/
 
@@ -447,11 +445,11 @@ public:
       }
     }
 
-    tf::Quaternion orientation;
-    tf::quaternionMsgToTF(startOdomMsg.pose.pose.orientation, orientation);
+    tf2::Quaternion orientation;
+    tf2::fromMsg(startOdomMsg.pose.pose.orientation, orientation);
 
     double roll, pitch, yaw;
-    tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
+    tf2::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
 
     // Initial guess used in mapOptimization
     cloudInfo->initialGuessX     = startOdomMsg.pose.pose.position.x;

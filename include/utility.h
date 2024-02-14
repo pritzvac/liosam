@@ -31,10 +31,8 @@
 #include <pcl/filters/crop_box.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-#include <tf/LinearMath/Quaternion.h>
-#include <tf/transform_listener.h>
-#include <tf/transform_datatypes.h>
-#include <tf/transform_broadcaster.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <tf2/convert.h>
 
 #include <vector>
 #include <cmath>
@@ -56,6 +54,7 @@
 
 #include <mrs_lib/param_loader.h>
 #include <mrs_lib/attitude_converter.h>
+#include <mrs_lib/transformer.h>
 
 #include <mrs_msgs/Float64ArrayStamped.h>
 
@@ -120,9 +119,9 @@ void imuAccel2rosAccel(sensor_msgs::Imu *thisImuMsg, T *acc_x, T *acc_y, T *acc_
 template <typename T>
 void imuRPY2rosRPY(sensor_msgs::Imu *thisImuMsg, T *rosRoll, T *rosPitch, T *rosYaw) {
   double         imuRoll, imuPitch, imuYaw;
-  tf::Quaternion orientation;
-  tf::quaternionMsgToTF(thisImuMsg->orientation, orientation);
-  tf::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw);
+  tf2::Quaternion orientation;
+  tf2::fromMsg(thisImuMsg->orientation, orientation);
+  tf2::Matrix3x3(orientation).getRPY(imuRoll, imuPitch, imuYaw);
 
   *rosRoll  = imuRoll;
   *rosPitch = imuPitch;
@@ -141,7 +140,7 @@ float pointDistance(PointType p1, PointType p2) {
 /*//}*/
 
 /*//{ imuConverter() */
-  sensor_msgs::Imu imuConverter(const sensor_msgs::Imu &imu_in, const Eigen::Matrix3d &extRot, const Eigen::Quaterniond &extQRPY) {
+  sensor_msgs::Imu imuConverter(const sensor_msgs::Imu &imu_in, const Eigen::Matrix3d &extRot, const Eigen::Quaterniond &extQRPY, const bool imuProvidesOrientation) {
 
     sensor_msgs::Imu imu_out = imu_in;
 
@@ -167,7 +166,7 @@ float pointDistance(PointType p1, PointType p2) {
     imu_out.orientation.z      = q_final.z();
     imu_out.orientation.w      = q_final.w();
 
-    if (sqrt(q_final.x() * q_final.x() + q_final.y() * q_final.y() + q_final.z() * q_final.z() + q_final.w() * q_final.w()) < 0.1) {
+    if (imuProvidesOrientation && sqrt(q_final.x() * q_final.x() + q_final.y() * q_final.y() + q_final.z() * q_final.z() + q_final.w() * q_final.w()) < 0.1) {
       ROS_ERROR("Invalid quaternion, please use a 9-axis IMU!");
       ros::shutdown();
     }
@@ -177,22 +176,24 @@ float pointDistance(PointType p1, PointType p2) {
 /*//}*/
 
 /*//{ findLidar2ImuTf() */
-void findLidar2ImuTf(const string &lidarFrame, const string &imuFrame, const string &baselinkFrame, Eigen::Matrix3d &extRot, Eigen::Quaterniond &extQRPY, tf::StampedTransform &tfLidar2Baselink, tf::StampedTransform &tfLidar2Imu) {
+void findLidar2ImuTf(std::shared_ptr<mrs_lib::Transformer> transformer, const string &lidarFrame, const string &imuFrame, const string &baselinkFrame, Eigen::Matrix3d &extRot, Eigen::Quaterniond &extQRPY, geometry_msgs::TransformStamped &tfLidar2Baselink, geometry_msgs::TransformStamped &tfLidar2Imu) {
 
-    tf::TransformListener tfListener;
     /*//{ find lidar -> base_link transform */
     if (lidarFrame != baselinkFrame) {
-
 
       bool tf_found = false;
       while (!tf_found) {
         try {
-          tfListener.waitForTransform(lidarFrame, baselinkFrame, ros::Time(0), ros::Duration(3.0));
-          tfListener.lookupTransform(lidarFrame, baselinkFrame, ros::Time(0), tfLidar2Baselink);
-          tf_found = true;
+          auto res = transformer->getTransform(lidarFrame, baselinkFrame, ros::Time(0));
+          if (res) {
+            tfLidar2Baselink = res.value();
+            tf_found = true;
+          } else {
+            ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+          }
         }
-        catch (tf::TransformException ex) {
-          ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+        catch (tf2::TransformException ex) {
+          ROS_ERROR("%s",ex.what());
         }
       }
 
@@ -200,8 +201,13 @@ void findLidar2ImuTf(const string &lidarFrame, const string &imuFrame, const str
 
     } else {
 
-      tfLidar2Baselink.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-      tfLidar2Baselink.setRotation(tf::createQuaternionFromRPY(0.0, 0.0, 0.0));
+      tfLidar2Baselink.transform.translation.x = 0;
+      tfLidar2Baselink.transform.translation.y = 0;
+      tfLidar2Baselink.transform.translation.z = 0;
+      tfLidar2Baselink.transform.rotation.x = 0;
+      tfLidar2Baselink.transform.rotation.y = 0;
+      tfLidar2Baselink.transform.rotation.z = 0;
+      tfLidar2Baselink.transform.rotation.w = 1;
     }
     /*//}*/
 
@@ -216,11 +222,15 @@ void findLidar2ImuTf(const string &lidarFrame, const string &imuFrame, const str
       bool tf_found = false;
       while (!tf_found) {
         try {
-          tfListener.waitForTransform(lidarFrame, imuFrame, ros::Time(0), ros::Duration(3.0));
-          tfListener.lookupTransform(lidarFrame, imuFrame, ros::Time(0), tfLidar2Imu);
-          tf_found = true;
+          auto res = transformer->getTransform(lidarFrame, imuFrame, ros::Time(0));
+          if (res) {
+            tfLidar2Imu = res.value();
+            tf_found = true;
+          } else {
+            ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
+          }
         }
-        catch (tf::TransformException ex) {
+        catch (tf2::TransformException ex) {
           ROS_WARN_THROTTLE(3.0, "Waiting for transform from: %s, to: %s.", lidarFrame.c_str(), imuFrame.c_str());
         }
       }
@@ -229,28 +239,33 @@ void findLidar2ImuTf(const string &lidarFrame, const string &imuFrame, const str
 
     } else {
 
-      tfLidar2Imu.setOrigin(tf::Vector3(0.0, 0.0, 0.0));
-      tfLidar2Imu.setRotation(tf::createQuaternionFromRPY(0.0, 0.0, 0.0));
+      tfLidar2Imu.transform.translation.x = 0;
+      tfLidar2Imu.transform.translation.y = 0;
+      tfLidar2Imu.transform.translation.z = 0;
+      tfLidar2Imu.transform.rotation.x = 0;
+      tfLidar2Imu.transform.rotation.y = 0;
+      tfLidar2Imu.transform.rotation.z = 0;
+      tfLidar2Imu.transform.rotation.w = 1;
     }
     /*//}*/
 
-    extQRPY = Eigen::Quaterniond(tfLidar2Imu.getRotation().w(), tfLidar2Imu.getRotation().x(), tfLidar2Imu.getRotation().y(), tfLidar2Imu.getRotation().z());
+    extQRPY = Eigen::Quaterniond(tfLidar2Imu.transform.rotation.w, tfLidar2Imu.transform.rotation.x, tfLidar2Imu.transform.rotation.y, tfLidar2Imu.transform.rotation.z);
     extRot  = Eigen::Matrix3d(extQRPY);
 
     ROS_INFO("Transform from: %s, to: %s.", lidarFrame.c_str(), baselinkFrame.c_str());
-    ROS_INFO("   xyz: (%0.1f, %0.1f, %0.1f); xyzq: (%0.1f, %0.1f, %0.1f, %0.1f)", tfLidar2Baselink.getOrigin().x(), tfLidar2Baselink.getOrigin().y(),
-             tfLidar2Baselink.getOrigin().z(), tfLidar2Baselink.getRotation().x(), tfLidar2Baselink.getRotation().y(), tfLidar2Baselink.getRotation().z(),
-             tfLidar2Baselink.getRotation().w());
+    ROS_INFO("   xyz: (%0.1f, %0.1f, %0.1f); xyzq: (%0.1f, %0.1f, %0.1f, %0.1f)", tfLidar2Baselink.transform.translation.x, tfLidar2Baselink.transform.translation.y,
+             tfLidar2Baselink.transform.translation.z, tfLidar2Baselink.transform.rotation.x, tfLidar2Baselink.transform.rotation.y, tfLidar2Baselink.transform.rotation.z,
+             tfLidar2Baselink.transform.rotation.w);
     ROS_INFO("Transform from: %s, to: %s.", lidarFrame.c_str(), imuFrame.c_str());
-    ROS_INFO("   xyz: (%0.1f, %0.1f, %0.1f); xyzq: (%0.1f, %0.1f, %0.1f, %0.1f)", tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(),
-             tfLidar2Imu.getOrigin().z(), tfLidar2Imu.getRotation().x(), tfLidar2Imu.getRotation().y(), tfLidar2Imu.getRotation().z(),
-             tfLidar2Imu.getRotation().w());
+    ROS_INFO("   xyz: (%0.1f, %0.1f, %0.1f); xyzq: (%0.1f, %0.1f, %0.1f, %0.1f)", tfLidar2Imu.transform.translation.x, tfLidar2Imu.transform.translation.y,
+             tfLidar2Imu.transform.translation.z, tfLidar2Imu.transform.rotation.x, tfLidar2Imu.transform.rotation.y, tfLidar2Imu.transform.rotation.z,
+             tfLidar2Imu.transform.rotation.w);
 
   }
 /*//}*/
 
 /*//{ containsNan() */
-bool containsNan(const tf::Transform& tf) {
+bool containsNan(const tf2::Transform& tf) {
   return isnan(tf.getOrigin().getX()) && isnan(tf.getOrigin().getY()) && isnan(tf.getOrigin().getZ()) && isnan(tf.getRotation().getX()) && isnan(tf.getRotation().getY()) && isnan(tf.getRotation().getZ()) && isnan(tf.getRotation().getW());
 }
 /*//}*/

@@ -2,6 +2,7 @@ imu:
   frame_id: "os_imu"
   topic: "os_cloud_nodelet/imu"
   gravity: 9.81
+  providesOrientation: false # requires 9-DOF IMU
   deskew: false # use imu to deskew cloud (requires 9-DOF IMU)
   interpolateOrientation: # linear interpolation between scan matching result and IMU orientation (requires 9-DOF IMU)
     enable: false

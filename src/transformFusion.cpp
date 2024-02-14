@@ -23,7 +23,7 @@ public:
   /*//}*/
 
   // TF
-  tf::StampedTransform tfLidar2Baselink;
+  geometry_msgs::TransformStamped tfLidar2Baselink;
 
   // IMU TF
   Eigen::Matrix3d    extRot;
@@ -36,6 +36,8 @@ public:
 
   ros::Publisher pubImuOdometry;
   ros::Publisher pubImuPath;
+
+  std::shared_ptr<mrs_lib::Transformer> transformer;
 
   Eigen::Affine3f lidarOdomAffine;
   Eigen::Affine3f imuOdomAffineFront;
@@ -52,6 +54,8 @@ public:
   virtual void onInit() {
 
     ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+
+    transformer = std::make_shared<mrs_lib::Transformer>(nh, "TransformFusion");
 
     /*//{ load parameters */
     mrs_lib::ParamLoader pl(nh, "TransformFusion");
@@ -72,8 +76,8 @@ public:
     }
     /*//}*/
 
-    tf::StampedTransform tfLidar2Imu;
-    findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+    geometry_msgs::TransformStamped tfLidar2Imu;
+    findLidar2ImuTf(transformer, lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
     subLaserOdometry = nh.subscribe<nav_msgs::Odometry>("liosam/fusion/odom_mapping_in", 5, &TransformFusion::lidarOdometryHandler, this, ros::TransportHints().tcpNoDelay());
     subImuOdometry =
@@ -93,9 +97,9 @@ public:
     x = odom.pose.pose.position.x;
     y = odom.pose.pose.position.y;
     z = odom.pose.pose.position.z;
-    tf::Quaternion orientation;
-    tf::quaternionMsgToTF(odom.pose.pose.orientation, orientation);
-    tf::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
+    tf2::Quaternion orientation;
+    tf2::fromMsg(odom.pose.pose.orientation, orientation);
+    tf2::Matrix3x3(orientation).getRPY(roll, pitch, yaw);
     return pcl::getTransformation(x, y, z, roll, pitch, yaw);
   }
   /*//}*/
@@ -129,9 +133,14 @@ public:
     // TODO: publish TFs correctly as `map -> odom -> fcu` (control has to handle this by continuously republishing the reference in map frame)
 
     // publish tf map->odom (inverted tf-tree)
-    static tf::TransformBroadcaster tfMap2Odom;
-    static tf::Transform            map_to_odom = tf::Transform(tf::createQuaternionFromRPY(0, 0, 0), tf::Vector3(0, 0, 0));
-    tfMap2Odom.sendTransform(tf::StampedTransform(map_to_odom.inverse(), odomMsg->header.stamp, odometryFrame, mapFrame));
+    static tf2_ros::TransformBroadcaster tfBroadcaster;
+    static tf2::Transform            tMap2Odom = tf2::Transform(tf2::Quaternion(0, 0, 0, 1), tf2::Vector3(0, 0, 0));
+    geometry_msgs::TransformStamped tfMap2Odom;
+    tfMap2Odom.header.stamp = odomMsg->header.stamp;
+    tfMap2Odom.header.frame_id = mapFrame;
+    tfMap2Odom.child_frame_id = odometryFrame;
+    tfMap2Odom.transform = tf2::toMsg(tMap2Odom);
+    tfBroadcaster.sendTransform(tfMap2Odom);
 
     std::lock_guard<std::mutex> lock(mtx);
 
@@ -163,11 +172,15 @@ public:
     pcl::getTranslationAndEulerAngles(imuOdomAffineLast, x, y, z, roll, pitch, yaw);
 
     // publish latest odometry
-    tf::Transform tCur;
-    tCur.setOrigin(tf::Vector3(x, y, z));
-    tCur.setRotation(tf::createQuaternionFromRPY(roll, pitch, yaw));
+    tf2::Transform tCur;
+    tCur.setOrigin(tf2::Vector3(x, y, z));
+    tf2::Quaternion qCur;
+    qCur.setRPY(roll, pitch, yaw);
+    tCur.setRotation(qCur);
     if (lidarFrame != baselinkFrame) {
-      tCur = tCur * tfLidar2Baselink;
+      tf2::Transform tLidar2Baselink;
+      tf2::fromMsg(tfLidar2Baselink.transform, tLidar2Baselink);
+      tCur = tCur * tLidar2Baselink;
     }
     tCur.setRotation(tCur.getRotation().normalized());
 
@@ -177,16 +190,20 @@ public:
     laserOdometry->pose.pose.position.x   = tCur.getOrigin().getX();
     laserOdometry->pose.pose.position.y   = tCur.getOrigin().getY();
     laserOdometry->pose.pose.position.z   = tCur.getOrigin().getZ();
-    tf::quaternionTFToMsg(tCur.getRotation(), laserOdometry->pose.pose.orientation);
+    laserOdometry->pose.pose.orientation = tf2::toMsg(tCur.getRotation());
 
     if (std::isfinite(laserOdometry->pose.pose.orientation.x) && std::isfinite(laserOdometry->pose.pose.orientation.y) &&
         std::isfinite(laserOdometry->pose.pose.orientation.z) && std::isfinite(laserOdometry->pose.pose.orientation.w)) {
       pubImuOdometry.publish(laserOdometry);
 
       // publish tf odom->fcu (inverted tf-tree)
-      static tf::TransformBroadcaster tfOdom2BaseLink;
-      tf::StampedTransform            odom_2_baselink = tf::StampedTransform(tCur.inverse(), odomMsg->header.stamp, baselinkFrame, odometryFrame);
-      tfOdom2BaseLink.sendTransform(odom_2_baselink);
+    static tf2_ros::TransformBroadcaster tfBroadcaster;
+    geometry_msgs::TransformStamped tfOdom2Baselink;
+    tfMap2Odom.header.stamp = odomMsg->header.stamp;
+    tfMap2Odom.header.frame_id = baselinkFrame;
+    tfMap2Odom.child_frame_id = odometryFrame;
+    tfMap2Odom.transform = tf2::toMsg(tCur.inverse());
+    tfBroadcaster.sendTransform(tfMap2Odom);
 
       // publish IMU path
       static nav_msgs::Path::Ptr imuPath        = boost::make_shared<nav_msgs::Path>();

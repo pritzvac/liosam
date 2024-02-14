@@ -43,6 +43,7 @@ namespace liosam
       std::string odometryFrame;
 
       // IMU
+      bool imuProvidesOrientation;
       double gravity;
 
       double linAccBiasNoise;
@@ -53,7 +54,7 @@ namespace liosam
       /*//}*/
 
       // TF
-      tf::StampedTransform tfLidar2Imu;
+      geometry_msgs::TransformStamped tfLidar2Imu;
 
       // IMU TF
       Eigen::Matrix3d extRot;
@@ -69,6 +70,8 @@ namespace liosam
       ros::Publisher pubAngVel;
       ros::Publisher pubAngVelBias;
       ros::Publisher pubDeltaV;
+
+      std::shared_ptr<mrs_lib::Transformer> transformer;
 
       bool systemInitialized = false;
 
@@ -116,6 +119,9 @@ namespace liosam
       virtual void onInit()
       {
         ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
+
+        transformer = std::make_shared<mrs_lib::Transformer>(nh, "ImuPreintegration");
+
         /*//{ load parameters */
         mrs_lib::ParamLoader pl(nh, "ImuPreintegration");
 
@@ -128,8 +134,9 @@ namespace liosam
         pl.loadParam("imu/topic", imuTopic);
         addNamespace("/" + uavName, imuTopic);
         pl.loadParam("imu/frame_id", imuFrame);
-        addNamespace("/" + uavName, imuFrame);
+        addNamespace(uavName, imuFrame);
         pl.loadParam("imu/gravity", gravity);
+        pl.loadParam("imu/providesOrientation", imuProvidesOrientation);
         pl.loadParam("imu/noise/linAccBias", linAccBiasNoise);
         pl.loadParam("imu/noise/angVelBias", angVelBiasNoise);
         pl.loadParam("imu/noise/linAcc", linAccNoise);
@@ -142,14 +149,13 @@ namespace liosam
         }
         /*//}*/
 
-        tf::StampedTransform tfLidar2Baselink;
-        findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+        geometry_msgs::TransformStamped tfLidar2Baselink;
+        findLidar2ImuTf(transformer, lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
         imu2Lidar =
-          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-tfLidar2Imu.getOrigin().x(), -tfLidar2Imu.getOrigin().y(), -tfLidar2Imu.getOrigin().z()));
+          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(-tfLidar2Imu.transform.translation.x, -tfLidar2Imu.transform.translation.y, -tfLidar2Imu.transform.translation.z));
         lidar2Imu =
-          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(tfLidar2Imu.getOrigin().x(), tfLidar2Imu.getOrigin().y(), tfLidar2Imu.getOrigin().z()));
-
+          gtsam::Pose3(gtsam::Rot3(1, 0, 0, 0), gtsam::Point3(tfLidar2Imu.transform.translation.x, tfLidar2Imu.transform.translation.y, tfLidar2Imu.transform.translation.z));
 
         subImu = nh.subscribe<sensor_msgs::Imu>(imuTopic, 2000, &ImuPreintegration::imuHandler, this,
                                                                      ros::TransportHints().tcpNoDelay());
@@ -530,7 +536,7 @@ namespace liosam
         ROS_INFO_ONCE("[ImuPreintegration]: imuHandler first callback");
         std::lock_guard<std::mutex> lock(mtx);
 
-        const sensor_msgs::Imu thisImu = imuConverter(*msg_in, extRot, extQRPY);
+        const sensor_msgs::Imu thisImu = imuConverter(*msg_in, extRot, extQRPY, imuProvidesOrientation);
 
         imuQueOpt.push_back(thisImu);
         imuQuePredict.push_back(thisImu);

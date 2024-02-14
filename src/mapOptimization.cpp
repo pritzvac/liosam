@@ -115,7 +115,7 @@ public:
   /*//}*/
 
   // TF
-  tf::StampedTransform tfLidar2Baselink;
+  geometry_msgs::TransformStamped tfLidar2Baselink;
 
   // IMU TF
   Eigen::Matrix3d    extRot;
@@ -147,6 +147,8 @@ public:
   ros::Subscriber subGPS;
   ros::Subscriber subLoop;
   ros::Subscriber subOrientation;
+
+  std::shared_ptr<mrs_lib::Transformer> transformer;
 
   std::deque<nav_msgs::Odometry> gpsQueue;
   liosam::cloud_info             cloudInfo;
@@ -240,6 +242,8 @@ public:
 
     ros::NodeHandle nh = nodelet::Nodelet::getMTPrivateNodeHandle();
 
+    transformer = std::make_shared<mrs_lib::Transformer>(nh, "MapOptimization");
+
     /*//{ load parameters */
     mrs_lib::ParamLoader pl(nh, "MapOptimization");
 
@@ -299,8 +303,8 @@ public:
 
     /*//}*/
 
-    tf::StampedTransform tfLidar2Imu;
-    findLidar2ImuTf(lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
+    geometry_msgs::TransformStamped tfLidar2Imu;
+    findLidar2ImuTf(transformer, lidarFrame, imuFrame, baselinkFrame, extRot, extQRPY, tfLidar2Baselink, tfLidar2Imu);
 
     ISAM2Params parameters;
     parameters.relinearizeThreshold = 0.1;
@@ -1537,20 +1541,20 @@ public:
     if (cloudInfo.imuAvailable) {
       if (std::abs(cloudInfo.imuPitchInit) < 1.4) {
         const double   imuWeight = imuRPYWeight;
-        tf::Quaternion imuQuaternion;
-        tf::Quaternion transformQuaternion;
+        tf2::Quaternion imuQuaternion;
+        tf2::Quaternion transformQuaternion;
         double         rollMid, pitchMid, yawMid;
 
         // slerp roll
         transformQuaternion.setRPY(transformTobeMapped[0], 0, 0);
         imuQuaternion.setRPY(cloudInfo.imuRollInit, 0, 0);
-        tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
+        tf2::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
         transformTobeMapped[0] = rollMid;
 
         // slerp pitch
         transformQuaternion.setRPY(0, transformTobeMapped[1], 0);
         imuQuaternion.setRPY(0, cloudInfo.imuPitchInit, 0);
-        tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
+        tf2::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
         transformTobeMapped[1] = pitchMid;
       }
     }
@@ -1842,7 +1846,8 @@ public:
     pose_stamped.pose.position.x    = pose_in.x;
     pose_stamped.pose.position.y    = pose_in.y;
     pose_stamped.pose.position.z    = pose_in.z;
-    tf::Quaternion q                = tf::createQuaternionFromRPY(pose_in.roll, pose_in.pitch, pose_in.yaw);
+    tf2::Quaternion q;
+    q.setRPY(pose_in.roll, pose_in.pitch, pose_in.yaw);
     pose_stamped.pose.orientation.x = q.x();
     pose_stamped.pose.orientation.y = q.y();
     pose_stamped.pose.orientation.z = q.z();
@@ -1858,19 +1863,19 @@ public:
     /* Eigen::Matrix4d T = Eigen::Matrix4d::Identity(); */
     /* Eigen::Matrix4d T_lidar = Eigen::Matrix4d::Identity(); */
 
-    tf::Transform T;
-    tf::Transform T_lidar;
+    tf2::Transform T;
+    tf2::Transform T_lidar;
 
-    // TODO: Load this as static TF
-    T.setOrigin(tf::Vector3(tfLidar2Baselink.getOrigin().x(), tfLidar2Baselink.getOrigin().y(), tfLidar2Baselink.getOrigin().z()));
-    /* T.setRotation(tf::createQuaternionFromRPY(0, 0, M_PI)); // os_lidar -> os_sensor */
-    T.setRotation(tf::createQuaternionFromRPY(0, 0, 0));  // os_sensor -> fcu
+    T.setOrigin(tf2::Vector3(tfLidar2Baselink.transform.translation.x, tfLidar2Baselink.transform.translation.y, tfLidar2Baselink.transform.translation.z));
+    T.setRotation(tf2::Quaternion(tfLidar2Baselink.transform.rotation.x, tfLidar2Baselink.transform.rotation.y, tfLidar2Baselink.transform.rotation.z, tfLidar2Baselink.transform.rotation.w));  // os_sensor -> fcu
 
     // transform from map to lidar
-    T_lidar.setOrigin(tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
-    T_lidar.setRotation(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]));
+    T_lidar.setOrigin(tf2::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5]));
+    tf2::Quaternion q_lidar;
+    q_lidar.setRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
+    T_lidar.setRotation(q_lidar);
 
-    const tf::Transform T_odom = T * T_lidar;
+    const tf2::Transform T_odom = T * T_lidar;
 
     if (containsNan(T_odom)) {
       ROS_ERROR("[MapOptimization]: NaN found in T_odom");
@@ -1885,7 +1890,7 @@ public:
     laserOdometryROS->pose.pose.position.x   = T_odom.getOrigin().getX();
     laserOdometryROS->pose.pose.position.y   = T_odom.getOrigin().getY();
     laserOdometryROS->pose.pose.position.z   = T_odom.getOrigin().getZ();
-    tf::quaternionTFToMsg(T_odom.getRotation(), laserOdometryROS->pose.pose.orientation);
+    laserOdometryROS->pose.pose.orientation = tf2::toMsg(T_odom.getRotation());
     /* laserOdometryROS->pose.pose.orientation   = orientationMsg.quaternion; */
     // ODOM: M -> FCU
     try {
@@ -1894,26 +1899,6 @@ public:
     catch (...) {
       ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubLaserOdometryGlobal.getTopic().c_str());
     }
-
-    // Publish odometry for ROS (global) in lidar frame
-    /* nav_msgs::Odometry laserOdometryROS; */
-    /* laserOdometryROS.header.stamp          = timeLaserInfoStamp; */
-    /* laserOdometryROS.header.frame_id       = odometryFrame; */
-    /* laserOdometryROS.child_frame_id        = baselinkFrame; */
-    /* laserOdometryROS.pose.pose.position.x  = transformTobeMapped[3]; */
-    /* laserOdometryROS.pose.pose.position.y  = transformTobeMapped[4]; */
-    /* laserOdometryROS.pose.pose.position.z  = transformTobeMapped[5]; */
-    /* laserOdometryROS.pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]);
-     */
-    /* pubLaserOdometryGlobal.publish(laserOdometryROS); */
-
-    // Publish TF
-    /* static tf::TransformBroadcaster br; */
-    /* tf::Transform        t_odom_to_lidar = tf::Transform(tf::createQuaternionFromRPY(transformTobeMapped[0], transformTobeMapped[1], transformTobeMapped[2]),
-     */
-    /*                                               tf::Vector3(transformTobeMapped[3], transformTobeMapped[4], transformTobeMapped[5])); */
-    /* tf::StampedTransform trans_odom_to_lidar = tf::StampedTransform(t_odom_to_lidar, timeLaserInfoStamp, odometryFrame, "lidar_link"); */
-    /* br.sendTransform(trans_odom_to_lidar); */
 
     // Publish odometry for ROS (incremental)
     static bool                    lastIncreOdomPubFlag = false;
@@ -1931,20 +1916,20 @@ public:
       if (cloudInfo.imuAvailable) {
         if (std::abs(cloudInfo.imuPitchInit) < 1.4) {
           const double   imuWeight = 0.1;
-          tf::Quaternion imuQuaternion;
-          tf::Quaternion transformQuaternion;
+          tf2::Quaternion imuQuaternion;
+          tf2::Quaternion transformQuaternion;
           double         rollMid, pitchMid, yawMid;
 
           // slerp roll
           transformQuaternion.setRPY(roll, 0, 0);
           imuQuaternion.setRPY(cloudInfo.imuRollInit, 0, 0);
-          tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
+          tf2::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
           roll = rollMid;
 
           // slerp pitch
           transformQuaternion.setRPY(0, pitch, 0);
           imuQuaternion.setRPY(0, cloudInfo.imuPitchInit, 0);
-          tf::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
+          tf2::Matrix3x3(transformQuaternion.slerp(imuQuaternion, imuWeight)).getRPY(rollMid, pitchMid, yawMid);
           pitch = pitchMid;
         }
       }
@@ -1954,7 +1939,9 @@ public:
       laserOdomIncremental->pose.pose.position.x  = x;
       laserOdomIncremental->pose.pose.position.y  = y;
       laserOdomIncremental->pose.pose.position.z  = z;
-      laserOdomIncremental->pose.pose.orientation = tf::createQuaternionMsgFromRollPitchYaw(roll, pitch, yaw);
+      tf2::Quaternion q;
+      q.setRPY(roll, pitch, yaw);
+      laserOdomIncremental->pose.pose.orientation = tf2::toMsg(q);
       /* laserOdomIncremental->pose.pose.orientation   = orientationMsg.quaternion; */
       if (isDegenerate) {
         laserOdomIncremental->pose.covariance[0] = 1;
