@@ -161,3 +161,23 @@ add_dependencies(TransformFusion
 target_link_libraries(TransformFusion
   ${catkin_LIBRARIES}
   )
+
+
+## --------------------------------------------------------------
+## |                           Install                          |
+## --------------------------------------------------------------
+
+install(TARGETS ${LIBRARIES}
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+  )
+
+install(DIRECTORY launch config include msg
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  )
+
+
+install(FILES estimator_plugins.xml
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+  )
