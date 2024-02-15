@@ -178,6 +178,6 @@ install(DIRECTORY launch config msg
   )
 
 
-install(FILES estimator_plugins.xml
+install(FILES plugins.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
