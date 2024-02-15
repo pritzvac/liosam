@@ -48,8 +48,17 @@ generate_messages(
   mrs_msgs
 )
 
+set(LIBRARIES
+  ImuPreintegration
+  MapOptimization
+  FeatureExtraction
+  ImageProjection
+  TransformFusion
+  )
+
 catkin_package(
   INCLUDE_DIRS include
+  LIBRARIES ${LIBRARIES}
   DEPENDS PCL GTSAM Boost
 
   CATKIN_DEPENDS 
