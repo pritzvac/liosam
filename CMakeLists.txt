@@ -173,7 +173,7 @@ install(TARGETS ${LIBRARIES}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
   )
 
-install(DIRECTORY launch config include msg
+install(DIRECTORY launch config msg
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   )
 

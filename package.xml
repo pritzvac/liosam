@@ -5,7 +5,7 @@
   <version>1.0.0</version>
   <description>Laser-inertial odometry by Tixiao Shan</description>
 
-  <maintainer email="petrapa6@fel.cvut.cz">Pavel Petracek</maintainer>
+  <maintainer email="matej.petrlik@fel.cvut.cz">Matej Petrlik</maintainer>
   <author>Tixiao Shan (shant@mit.edu)</author>
 
   <license>TODO</license>
