@@ -589,22 +589,6 @@ namespace liosam
         odometry->twist.twist.angular.z = thisImu.angular_velocity.z + prevBiasOdom_.gyroscope().z();
         pubPreOdometry.publish(odometry);
 
-        geometry_msgs::Vector3Stamped accBiasMsg;
-        accBiasMsg.header.stamp = ros::Time::now();
-        accBiasMsg.header.frame_id = "fcu";
-        accBiasMsg.vector.x = prevBiasOdom_.accelerometer().x();
-        accBiasMsg.vector.y = prevBiasOdom_.accelerometer().y();
-        accBiasMsg.vector.z = prevBiasOdom_.accelerometer().z();
-        pubLinAccBias.publish(accBiasMsg);
-
-        geometry_msgs::Vector3Stamped gyroBiasMsg;
-        gyroBiasMsg.header.stamp = ros::Time::now();
-        gyroBiasMsg.header.frame_id = "fcu";
-        gyroBiasMsg.vector.x = prevBiasOdom_.gyroscope().x();
-        gyroBiasMsg.vector.y = prevBiasOdom_.gyroscope().y();
-        gyroBiasMsg.vector.z = prevBiasOdom_.gyroscope().z();
-        pubAngVelBias.publish(gyroBiasMsg);
-
       }
       /*//}*/
     };
