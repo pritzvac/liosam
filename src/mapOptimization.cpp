@@ -15,6 +15,8 @@
 
 #include <gtsam/nonlinear/ISAM2.h>
 
+#include "liosam/eigenvalues.h"
+
 using namespace gtsam;
 
 using symbol_shorthand::B;  // Bias  (ax,ay,az,gx,gy,gz)
@@ -142,11 +144,14 @@ public:
   ros::Publisher pubCloudRegisteredRaw;
   ros::Publisher pubLoopConstraintEdge;
 
+  ros::Publisher pubEigenvalues;
+
   ros::Subscriber subCloud;
   ros::Subscriber subOrigCloudInfo;
   ros::Subscriber subGPS;
   ros::Subscriber subLoop;
   ros::Subscriber subOrientation;
+
 
   std::shared_ptr<mrs_lib::Transformer> transformer;
 
@@ -212,6 +217,9 @@ public:
 
   bool    isDegenerate = false;
   cv::Mat matP;
+
+  cv::Mat matE_;
+  cv::Mat matV_;
 
   int laserCloudCornerFromMapDSNum = 0;
   int laserCloudSurfFromMapDSNum   = 0;
@@ -338,6 +346,8 @@ public:
     pubRecentKeyFrame     = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_out", 1);
     pubCloudRegisteredRaw = nh.advertise<sensor_msgs::PointCloud2>("liosam/mapping/cloud_registered_raw_out", 1);
 
+    pubEigenvalues = nh.advertise<liosam::eigenvalues>("liosam/mapping/eigenvalues", 1);
+
     downSizeFilterCorner.setLeafSize(mappingCornerLeafSize, mappingCornerLeafSize, mappingCornerLeafSize);
     downSizeFilterSurf.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
     downSizeFilterICP.setLeafSize(mappingSurfLeafSize, mappingSurfLeafSize, mappingSurfLeafSize);
@@ -390,6 +400,9 @@ public:
     }
 
     matP = cv::Mat(6, 6, CV_32F, cv::Scalar::all(0));
+
+    matE_ = cv::Mat(1, 6, CV_32F, cv::Scalar::all(0));
+    matV_ = cv::Mat(6, 6, CV_32F, cv::Scalar::all(0));
   }
   /*//}*/
 
@@ -1453,11 +1466,15 @@ public:
       cv::Mat matV(6, 6, CV_32F, cv::Scalar::all(0));
       cv::Mat matV2(6, 6, CV_32F, cv::Scalar::all(0));
 
+      // matE - eigenvalues in descending order
+      // matV - eigenvectors as matrix rows in the same order as the eigenvalues
+      // solution remapping
       cv::eigen(matAtA, matE, matV);
       matV.copyTo(matV2);
 
       isDegenerate            = false;
-      const float eignThre[6] = {100, 100, 100, 100, 100, 100};
+      /* const float eignThre[6] = {100, 100, 100, 100, 100, 100}; */
+      const float eignThre[6] = {200, 200, 200, 200, 200, 200};
       for (int i = 5; i >= 0; i--) {
         if (matE.at<float>(0, i) < eignThre[i]) {
           for (int j = 0; j < 6; j++) {
@@ -1469,11 +1486,17 @@ public:
         }
       }
       matP = matV.inv() * matV2;
+
+      // just save matE and matV to some class variable here and publish them when publishing the odometry
+      matE.copyTo(matE_);
+      matV.copyTo(matV_);
+      // probably need to transform the vectors using the transformToBeMapped
     }
 
     if (isDegenerate) {
       cv::Mat matX2(6, 1, CV_32F, cv::Scalar::all(0));
       matX.copyTo(matX2);
+      // V_f^{-1} * V_u * deltaX
       matX = matP * matX2;
     }
 
@@ -1955,6 +1978,24 @@ public:
     catch (...) {
       ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubLaserOdometryIncremental.getTopic().c_str());
     }
+
+    liosam::eigenvalues msg_eig;
+    msg_eig.header.stamp = timeLaserInfoStamp;
+    for (int i = 0; i < 6; i++){
+      msg_eig.eigenvalues[i] = matE_.at<float>(0, i);
+      for (int j = 0; j < 6; j++){
+        msg_eig.eigenvectors[i*6 + j] = matV_.at<float>(i, j);
+      }
+    }
+
+    try {
+      pubEigenvalues.publish(msg_eig);
+    }
+    catch (...) {
+      ROS_ERROR("[LioSam|MO]: Exception caught during publishing topic %s.", pubEigenvalues.getTopic().c_str());
+    }
+    
+
   }
   /*//}*/
 

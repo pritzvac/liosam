@@ -37,6 +37,7 @@ add_message_files(
   DIRECTORY msg
   FILES
   cloud_info.msg
+  eigenvalues.msg
 )
 
 generate_messages(
